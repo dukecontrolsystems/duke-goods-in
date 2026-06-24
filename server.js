@@ -223,6 +223,7 @@ app.post('/api/deliveries', requireAuth, (req, res) => {
     db.prepare('INSERT INTO deliveries (id, po_id, po_number, supplier, project, delivery_date, carrier, dn_ref, status, received_by, image_path, ai_summary) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
       .run(id, po_id || '', po_number || '', supplier || '', project || '', delivery_date || '', carrier || '', dn_ref || '', status || 'complete', req.session.user.name, image_path || '', ai_summary || '');
 
+    db.pragma('foreign_keys = OFF');
     const insertLine = db.prepare('INSERT INTO delivery_lines (id, delivery_id, po_line_id, description, part_number, ordered, received, status, note, is_unexpected) VALUES (?,?,?,?,?,?,?,?,?,?)');
     (lines || []).forEach(l => {
       const desc = l.desc || l.description || '';
@@ -234,6 +235,7 @@ app.post('/api/deliveries', requireAuth, (req, res) => {
       const partno = l.partno || l.part_number || '';
       if (desc) insertLine.run(uid(), id, '', desc, partno, 0, l.received || 0, 'unexpected', l.note || '', 1);
     });
+    db.pragma('foreign_keys = ON');
 
     if (po_id && (lines || []).every(l => l.status === 'ok')) {
       db.prepare("UPDATE purchase_orders SET status='complete' WHERE id=?").run(po_id);
