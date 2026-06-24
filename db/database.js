@@ -1,7 +1,13 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
 
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'goods-in.db');
+
+// Ensure directory exists
+const dbDir = path.dirname(DB_PATH);
+if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+
 const db = new Database(DB_PATH);
 
 db.exec(`
@@ -67,14 +73,23 @@ db.exec(`
   );
 `);
 
-// Seed default users if none exist
-const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();
-if (userCount.c >= 0) {
-  db.prepare('INSERT INTO users (name, pin, role) VALUES (?, ?, ?)').run('Stephen', '1234', 'admin');
-  db.prepare('INSERT INTO users (name, pin, role) VALUES (?, ?, ?)').run('Nick', '2345', 'staff');
-  db.prepare('INSERT INTO users (name, pin, role) VALUES (?, ?, ?)').run('Rob', '3456', 'staff');
-  db.prepare('INSERT INTO users (name, pin, role) VALUES (?, ?, ?)').run('Site Staff', '0000', 'staff');
-  console.log('Default users seeded');
-}
+// Clean up any duplicate users then ensure defaults exist
+db.exec(`DELETE FROM users WHERE id NOT IN (SELECT MIN(id) FROM users GROUP BY LOWER(name))`);
+
+const defaultUsers = [
+  { name: 'Stephen', pin: '1234', role: 'admin' },
+  { name: 'Nick', pin: '2345', role: 'staff' },
+  { name: 'Rob', pin: '3456', role: 'staff' },
+  { name: 'Site Staff', pin: '0000', role: 'staff' }
+];
+
+const upsert = db.prepare(`INSERT OR IGNORE INTO users (name, pin, role) VALUES (?, ?, ?)`);
+defaultUsers.forEach(u => upsert.run(u.name, u.pin, u.role));
+
+// Ensure PINs are correct for default users
+const updatePin = db.prepare(`UPDATE users SET pin=?, role=? WHERE LOWER(name)=LOWER(?)`);
+defaultUsers.forEach(u => updatePin.run(u.pin, u.role, u.name));
+
+console.log('Users ready:', db.prepare('SELECT name, role FROM users').all().map(u => u.name).join(', '));
 
 module.exports = db;
