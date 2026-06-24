@@ -132,7 +132,7 @@ For project: extract any project name, job number or reference. Return empty str
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 8000, system: sys, messages: [{ role: 'user', content: userContent }] })
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 16000, system: sys, messages: [{ role: 'user', content: userContent }] })
     });
     const data = await response.json();
     const text = data.content?.find(b => b.type === 'text')?.text || '';
@@ -217,7 +217,7 @@ Rules: match part number first then description; ok=received>=ordered; short=0<r
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 8000, system: sys, messages: [{ role: 'user', content: userContent }] })
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 16000, system: sys, messages: [{ role: 'user', content: userContent }] })
     });
     const data = await response.json();
     const text2 = data.content?.find(b => b.type === 'text')?.text || '';
