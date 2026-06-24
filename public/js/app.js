@@ -43,7 +43,7 @@ function showApp(user) {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.getElementById('nav-user').textContent = user.name;
-  setTimeout(updateUnmatchedCount, 500);
+  try { setTimeout(updateUnmatchedCount, 1000); } catch(e) {}
 }
 
 async function logout() {
@@ -600,4 +600,31 @@ function exportCSV() {
     a.download = 'duke-goods-in.csv';
     a.click();
   });
+}
+
+// ── Helpers ────────────────────────────────────────────
+async function api(url, method = 'GET', body) {
+  const opts = { method, headers: {} };
+  if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const res = await fetch(url, opts);
+  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || res.statusText); }
+  return res.json();
+}
+
+async function apiFD(url, fd) {
+  const res = await fetch(url, { method: 'POST', body: fd });
+  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || res.statusText); }
+  return res.json();
+}
+
+function show(id, visible) {
+  document.getElementById(id).style.display = visible ? 'block' : 'none';
+}
+function setMsg(msg) { document.getElementById('processing-msg').textContent = msg; }
+function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+function today() { return new Date().toISOString().slice(0, 10); }
+function toast(msg, dur = 2800) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), dur);
 }
