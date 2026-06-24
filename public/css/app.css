@@ -444,3 +444,27 @@ hr.divider { border: none; border-top: 1px solid #eee; margin: 1rem 0; }
   .stat-grid { gap: 12px; }
   .stat-n { font-size: 26px; }
 }
+
+/* ── HOME SCREEN ── */
+.home-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  background: #fff;
+  border: 0.5px solid #e5e5e5;
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: transform 0.1s, box-shadow 0.1s;
+  text-align: left;
+  width: 100%;
+}
+.home-card:active { transform: scale(0.97); box-shadow: none; }
+.home-card-primary { background: var(--navy); border-color: var(--navy); }
+.home-card-primary .home-card-title { color: #fff; }
+.home-card-primary .home-card-sub { color: rgba(255,255,255,0.7); }
+.home-card-primary .home-card-icon { filter: none; }
+.home-card-icon { font-size: 30px; margin-bottom: 10px; line-height: 1; }
+.home-card-title { font-size: 14px; font-weight: 700; color: var(--navy); display: block; margin-bottom: 4px; }
+.home-card-sub { font-size: 12px; color: #888; display: block; line-height: 1.4; }
