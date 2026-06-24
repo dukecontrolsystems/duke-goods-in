@@ -221,7 +221,7 @@ app.post('/api/deliveries', requireAuth, (req, res) => {
     const { po_id, po_number, supplier, project, delivery_date, carrier, dn_ref, status, lines, unmatched, image_path, ai_summary } = req.body;
     const id = uid();
     db.prepare('INSERT INTO deliveries (id, po_id, po_number, supplier, project, delivery_date, carrier, dn_ref, status, received_by, image_path, ai_summary) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
-      .run(id, po_id || '', po_number || '', supplier || '', project || '', delivery_date || '', carrier || '', dn_ref || '', status || 'complete', req.session.user.name, image_path || '', ai_summary || '');
+      .run(id, po_id || null, po_number || '', supplier || '', project || '', delivery_date || '', carrier || '', dn_ref || '', status || 'complete', req.session.user.name, image_path || '', ai_summary || '');
 
     db.pragma('foreign_keys = OFF');
     const insertLine = db.prepare('INSERT INTO delivery_lines (id, delivery_id, po_line_id, description, part_number, ordered, received, status, note, is_unexpected) VALUES (?,?,?,?,?,?,?,?,?,?)');
