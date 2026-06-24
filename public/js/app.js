@@ -392,12 +392,46 @@ function togglePO(id) {
   loadOrders();
 }
 
+let allProjectNames = [];
+
 async function loadProjectSuggestions() {
   try {
-    const names = await api('/api/project-names');
-    const dl = document.getElementById('project-suggestions');
-    if (dl) dl.innerHTML = names.map(n => `<option value="${n.replace(/"/g,'&quot;')}">`).join('');
-  } catch(e) {}
+    allProjectNames = await api('/api/project-names');
+  } catch(e) { allProjectNames = []; }
+}
+
+function showProjectDropdown() {
+  renderProjectDropdown(allProjectNames);
+}
+
+function hideProjectDropdown() {
+  const dd = document.getElementById('project-dropdown');
+  if (dd) dd.style.display = 'none';
+}
+
+function filterProjects(val) {
+  const filtered = val
+    ? allProjectNames.filter(n => n.toLowerCase().includes(val.toLowerCase()))
+    : allProjectNames;
+  renderProjectDropdown(filtered);
+}
+
+function renderProjectDropdown(names) {
+  const dd = document.getElementById('project-dropdown');
+  if (!dd) return;
+  if (!names.length) { dd.style.display = 'none'; return; }
+  dd.innerHTML = names.map(n =>
+    `<div onclick="selectProject('${n.replace(/'/g,"\'")}")"
+      style="padding:10px 14px;font-size:14px;cursor:pointer;border-bottom:0.5px solid #f0f0f0;color:#1a1a1a"
+      onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">${esc(n)}</div>`
+  ).join('');
+  dd.style.display = 'block';
+}
+
+function selectProject(name) {
+  const input = document.getElementById('po-project-input');
+  if (input) input.value = name;
+  hideProjectDropdown();
 }
 
 function showAddPO() {
