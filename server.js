@@ -148,7 +148,7 @@ For project: extract any project name, job number or reference. Return empty str
 });
 
 // ─── AI MATCH DELIVERY NOTE ─────────────────────────────
-app.post('/api/match-delivery', requireAuth, upload.array('file', 10), async (req, res) => {
+app.post('/api/match-delivery', requireAuth, upload.array('file', 50), async (req, res) => {
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set' });
