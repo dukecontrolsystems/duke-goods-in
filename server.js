@@ -84,9 +84,17 @@ app.post('/api/pos', requireAuth, (req, res) => {
 });
 
 app.delete('/api/pos/:id', requireAuth, (req, res) => {
-  db.prepare('DELETE FROM po_lines WHERE po_id=?').run(req.params.id);
-  db.prepare('DELETE FROM purchase_orders WHERE id=?').run(req.params.id);
-  res.json({ ok: true });
+  try {
+    db.pragma('foreign_keys = OFF');
+    db.prepare('DELETE FROM po_lines WHERE po_id=?').run(req.params.id);
+    db.prepare('UPDATE deliveries SET po_id=NULL WHERE po_id=?').run(req.params.id);
+    db.prepare('DELETE FROM purchase_orders WHERE id=?').run(req.params.id);
+    db.pragma('foreign_keys = ON');
+    res.json({ ok: true });
+  } catch(e) {
+    console.error('delete PO error:', e);
+    res.status(500).json({ error: 'Delete failed: ' + e.message });
+  }
 });
 
 // ─── AI EXTRACT PO ──────────────────────────────────────
