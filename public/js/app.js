@@ -421,18 +421,31 @@ function renderProjectDropdown(names) {
   if (!dd) return;
   if (!names.length) { dd.style.display = 'none'; return; }
   dd.innerHTML = names.map(n =>
-    `<div onclick="selectProject('${n.replace(/'/g,"\'")}")"
+    `<div data-name="${esc(n)}"
       style="padding:10px 14px;font-size:14px;cursor:pointer;border-bottom:0.5px solid #f0f0f0;color:#1a1a1a"
-      onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">${esc(n)}</div>`
+      onmouseover="this.style.background='#EAF3DE'" onmouseout="this.style.background=''">${esc(n)}</div>`
   ).join('');
+  dd.onclick = function(e) {
+    const item = e.target.closest('[data-name]');
+    if (item) selectProject(item.getAttribute('data-name'));
+  };
   dd.style.display = 'block';
 }
 
 function selectProject(name) {
   const input = document.getElementById('po-project-input');
-  if (input) input.value = name;
+  if (input) { input.value = name; input.focus(); }
   hideProjectDropdown();
 }
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+  const dd = document.getElementById('project-dropdown');
+  const input = document.getElementById('po-project-input');
+  if (dd && !dd.contains(e.target) && e.target !== input) {
+    dd.style.display = 'none';
+  }
+});
 
 function showAddPO() {
   document.getElementById('add-po-panel').style.display = 'block';
