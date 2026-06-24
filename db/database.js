@@ -36,8 +36,7 @@ db.exec(`
     part_number TEXT,
     quantity REAL NOT NULL,
     unit TEXT,
-    delivery_date TEXT,
-    FOREIGN KEY (po_id) REFERENCES purchase_orders(id)
+    delivery_date TEXT
   );
 
   CREATE TABLE IF NOT EXISTS deliveries (
@@ -53,8 +52,7 @@ db.exec(`
     received_by TEXT,
     image_path TEXT,
     ai_summary TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (po_id) REFERENCES purchase_orders(id)
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
   CREATE TABLE IF NOT EXISTS delivery_lines (
@@ -67,19 +65,40 @@ db.exec(`
     received REAL DEFAULT 0,
     status TEXT,
     note TEXT,
-    is_unexpected INTEGER DEFAULT 0,
-    FOREIGN KEY (delivery_id) REFERENCES deliveries(id)
+    is_unexpected INTEGER DEFAULT 0
   );
 `);
 
-db.prepare('DELETE FROM users').run();
-const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();
-if (userCount.c === 0) {
-  db.prepare('INSERT INTO users (name, pin, role) VALUES (?, ?, ?)').run('Stephen', '1234', 'admin');
-  db.prepare('INSERT INTO users (name, pin, role) VALUES (?, ?, ?)').run('Nick', '2345', 'staff');
-  db.prepare('INSERT INTO users (name, pin, role) VALUES (?, ?, ?)').run('Rob', '3456', 'staff');
-  db.prepare('INSERT INTO users (name, pin, role) VALUES (?, ?, ?)').run('Site Staff', '0000', 'staff');
-  console.log('Default users seeded');
+// Migrate delivery_lines to remove foreign key if it exists
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS delivery_lines_new (
+      id TEXT PRIMARY KEY,
+      delivery_id TEXT NOT NULL,
+      po_line_id TEXT,
+      description TEXT NOT NULL,
+      part_number TEXT,
+      ordered REAL DEFAULT 0,
+      received REAL DEFAULT 0,
+      status TEXT,
+      note TEXT,
+      is_unexpected INTEGER DEFAULT 0
+    );
+    INSERT OR IGNORE INTO delivery_lines_new SELECT * FROM delivery_lines;
+    DROP TABLE delivery_lines;
+    ALTER TABLE delivery_lines_new RENAME TO delivery_lines;
+  `);
+  console.log('delivery_lines migrated');
+} catch(e) {
+  console.log('Migration skipped:', e.message);
 }
+
+// Seed default users
+db.prepare('DELETE FROM users').run();
+db.prepare("INSERT INTO users (name, pin, role) VALUES ('Stephen','1234','admin')").run();
+db.prepare("INSERT INTO users (name, pin, role) VALUES ('Nick','2345','staff')").run();
+db.prepare("INSERT INTO users (name, pin, role) VALUES ('Rob','3456','staff')").run();
+db.prepare("INSERT INTO users (name, pin, role) VALUES ('Site Staff','0000','staff')").run();
+console.log('Users seeded');
 
 module.exports = db;
