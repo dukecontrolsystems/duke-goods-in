@@ -114,11 +114,14 @@ For project: extract any project name, job number or reference. Return empty str
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2000, system: sys, messages: [{ role: 'user', content: userContent }] })
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 4000, system: sys, messages: [{ role: 'user', content: userContent }] })
     });
     const data = await response.json();
     const text = data.content?.find(b => b.type === 'text')?.text || '';
-    const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+    console.log('extract-po raw:', text.slice(0, 300));
+    const js = text.indexOf('{'); const je = text.lastIndexOf('}');
+    if (js === -1 || je === -1) throw new Error('No JSON in response: ' + text.slice(0, 200));
+    const parsed = JSON.parse(text.slice(js, je + 1));
     res.json(parsed);
   } catch (e) {
     console.error('extract-po error:', e);
@@ -186,6 +189,7 @@ Rules: match part number first then description; ok=received>=ordered; short=0<r
     });
     const data = await response.json();
     const text2 = data.content?.find(b => b.type === 'text')?.text || '';
+    console.log('match-delivery raw:', text2.slice(0, 300));
     const jsonStart = text2.indexOf('{');
     const jsonEnd = text2.lastIndexOf('}');
     if (jsonStart === -1 || jsonEnd === -1) throw new Error('No JSON in response: ' + text2.slice(0, 200));
@@ -255,6 +259,47 @@ app.post('/api/users', requireAuth, (req, res) => {
 app.delete('/api/users/:id', requireAuth, (req, res) => {
   if (req.session.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
   db.prepare('DELETE FROM users WHERE id=?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+
+// ─── UNMATCHED DELIVERIES ────────────────────────────────
+app.get('/api/unmatched', requireAuth, (req, res) => {
+  const deliveries = db.prepare("SELECT * FROM deliveries WHERE status='unmatched' ORDER BY created_at DESC").all();
+  deliveries.forEach(d => { d.lines = db.prepare('SELECT * FROM delivery_lines WHERE delivery_id=?').all(d.id); });
+  res.json(deliveries);
+});
+
+// Link unmatched delivery to a PO
+app.post('/api/unmatched/:id/link', requireAuth, (req, res) => {
+  const { po_id } = req.body;
+  if (!po_id) return res.status(400).json({ error: 'po_id required' });
+  const po = db.prepare('SELECT * FROM purchase_orders WHERE id=?').get(po_id);
+  if (!po) return res.status(404).json({ error: 'PO not found' });
+  db.prepare("UPDATE deliveries SET status='complete', po_id=?, po_number=?, supplier=?, project=? WHERE id=?")
+    .run(po_id, po.number, po.supplier, po.project, req.params.id);
+  res.json({ ok: true });
+});
+
+// Create PO from unmatched delivery
+app.post('/api/unmatched/:id/create-po', requireAuth, (req, res) => {
+  const { number, supplier, project, expected_date, lines } = req.body;
+  if (!number || !supplier) return res.status(400).json({ error: 'Number and supplier required' });
+  const poId = uid();
+  db.prepare('INSERT INTO purchase_orders (id, number, supplier, project, expected_date, created_by) VALUES (?,?,?,?,?,?)')
+    .run(poId, number, supplier, project || '', expected_date || '', req.session.user.name);
+  const insertLine = db.prepare('INSERT INTO po_lines (id, po_id, description, part_number, quantity, unit, delivery_date) VALUES (?,?,?,?,?,?,?)');
+  (lines || []).forEach(l => insertLine.run(uid(), poId, l.description || '', l.part_number || '', l.quantity || 1, l.unit || '', ''));
+  // Link the delivery to the new PO and mark complete
+  db.prepare("UPDATE deliveries SET status='complete', po_id=?, po_number=?, supplier=?, project=? WHERE id=?")
+    .run(poId, number, supplier, project || '', req.params.id);
+  res.json({ ok: true, po_id: poId });
+});
+
+// Delete unmatched delivery
+app.delete('/api/unmatched/:id', requireAuth, (req, res) => {
+  db.prepare('DELETE FROM delivery_lines WHERE delivery_id=?').run(req.params.id);
+  db.prepare('DELETE FROM deliveries WHERE id=?').run(req.params.id);
   res.json({ ok: true });
 });
 
