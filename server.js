@@ -182,11 +182,14 @@ Rules: match part number first then description; ok=received>=ordered; short=0<r
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2000, system: sys, messages: [{ role: 'user', content: userContent }] })
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 4000, system: sys, messages: [{ role: 'user', content: userContent }] })
     });
     const data = await response.json();
     const text2 = data.content?.find(b => b.type === 'text')?.text || '';
-    const result = JSON.parse(text2.replace(/```json|```/g, '').trim());
+    const jsonStart = text2.indexOf('{');
+    const jsonEnd = text2.lastIndexOf('}');
+    if (jsonStart === -1 || jsonEnd === -1) throw new Error('No JSON in response: ' + text2.slice(0, 200));
+    const result = JSON.parse(text2.slice(jsonStart, jsonEnd + 1));
     result.imagePath = imagePath;
     res.json(result);
   } catch (e) {
