@@ -274,7 +274,7 @@ async function loadProjects() {
     }).join('');
 
     return `<div class="proj-card">
-      <div class="proj-header" onclick="toggleProject(${JSON.stringify(proj.name)})">
+      <div class="proj-header" onclick="toggleProject(this)" data-projname="${esc(proj.name)}">
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
             <span class="proj-name">${esc(proj.name)}</span>${statusBadge}
@@ -290,7 +290,8 @@ async function loadProjects() {
   }).join('');
 }
 
-function toggleProject(name) {
+function toggleProject(el) {
+  const name = el.dataset.projname;
   expandedProjects[name] = !expandedProjects[name];
   loadProjects();
 }
@@ -416,7 +417,7 @@ async function savePO() {
   try {
     await api('/api/pos', 'POST', {
       number, supplier,
-      project: document.getElementById('po-project-input').value.trim() || document.getElementById('po-project').value.trim(),
+      project: document.getElementById('po-project').value.trim(),
       expected_date: document.getElementById('po-expected').value,
       lines: pendingPOLines
     });
