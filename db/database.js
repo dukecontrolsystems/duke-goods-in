@@ -72,6 +72,7 @@ db.exec(`
   );
 `);
 
+db.prepare('DELETE FROM users').run();
 const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();
 if (userCount.c === 0) {
   db.prepare('INSERT INTO users (name, pin, role) VALUES (?, ?, ?)').run('Stephen', '1234', 'admin');
