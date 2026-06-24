@@ -333,6 +333,8 @@ function cancelAddPO() {
 
 async function extractPO() {
   const text = document.getElementById('po-text').value.trim();
+  const projectInput = document.getElementById('po-project-input').value.trim();
+  if (!projectInput) { toast('Please enter a project / job name first'); return; }
   if (!poSelectedFile && !text) { toast('Choose a file or paste text first'); return; }
   show('po-processing', true);
   document.getElementById('extract-btn').disabled = true;
