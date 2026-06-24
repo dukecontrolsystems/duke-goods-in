@@ -217,20 +217,32 @@ Rules: match part number first then description; ok=received>=ordered; short=0<r
 
 // ─── DELIVERIES ─────────────────────────────────────────
 app.post('/api/deliveries', requireAuth, (req, res) => {
-  const { po_id, po_number, supplier, project, delivery_date, carrier, dn_ref, status, lines, unmatched, image_path, ai_summary } = req.body;
-  const id = uid();
-  db.prepare('INSERT INTO deliveries (id, po_id, po_number, supplier, project, delivery_date, carrier, dn_ref, status, received_by, image_path, ai_summary) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
-    .run(id, po_id || '', po_number || '', supplier || '', project || '', delivery_date || '', carrier || '', dn_ref || '', status || 'complete', req.session.user.name, image_path || '', ai_summary || '');
+  try {
+    const { po_id, po_number, supplier, project, delivery_date, carrier, dn_ref, status, lines, unmatched, image_path, ai_summary } = req.body;
+    const id = uid();
+    db.prepare('INSERT INTO deliveries (id, po_id, po_number, supplier, project, delivery_date, carrier, dn_ref, status, received_by, image_path, ai_summary) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(id, po_id || '', po_number || '', supplier || '', project || '', delivery_date || '', carrier || '', dn_ref || '', status || 'complete', req.session.user.name, image_path || '', ai_summary || '');
 
-  const insertLine = db.prepare('INSERT INTO delivery_lines (id, delivery_id, po_line_id, description, part_number, ordered, received, status, note, is_unexpected) VALUES (?,?,?,?,?,?,?,?,?,?)');
-  (lines || []).forEach(l => insertLine.run(uid(), id, l.poLineId || '', l.desc || '', l.partno || '', l.ordered || 0, l.received || 0, l.status || '', l.note || '', 0));
-  (unmatched || []).forEach(l => insertLine.run(uid(), id, '', l.desc || '', l.partno || '', 0, l.received || 0, 'unexpected', l.note || '', 1));
+    const insertLine = db.prepare('INSERT INTO delivery_lines (id, delivery_id, po_line_id, description, part_number, ordered, received, status, note, is_unexpected) VALUES (?,?,?,?,?,?,?,?,?,?)');
+    (lines || []).forEach(l => {
+      const desc = l.desc || l.description || '';
+      const partno = l.partno || l.part_number || '';
+      if (desc) insertLine.run(uid(), id, l.poLineId || '', desc, partno, l.ordered || 0, l.received || 0, l.status || '', l.note || '', 0);
+    });
+    (unmatched || []).forEach(l => {
+      const desc = l.desc || l.description || '';
+      const partno = l.partno || l.part_number || '';
+      if (desc) insertLine.run(uid(), id, '', desc, partno, 0, l.received || 0, 'unexpected', l.note || '', 1);
+    });
 
-  // Mark PO complete if all lines received
-  if (po_id && (lines || []).every(l => l.status === 'ok')) {
-    db.prepare("UPDATE purchase_orders SET status='complete' WHERE id=?").run(po_id);
+    if (po_id && (lines || []).every(l => l.status === 'ok')) {
+      db.prepare("UPDATE purchase_orders SET status='complete' WHERE id=?").run(po_id);
+    }
+    res.json({ ok: true, id });
+  } catch(e) {
+    console.error('deliveries POST error:', e);
+    res.status(500).json({ error: 'Failed to save delivery: ' + e.message });
   }
-  res.json({ ok: true, id });
 });
 
 app.get('/api/deliveries', requireAuth, (req, res) => {
