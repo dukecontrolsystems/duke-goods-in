@@ -474,6 +474,8 @@ function cancelAddPO() {
 
 async function extractPO() {
   const text = document.getElementById('po-text').value.trim();
+  const projectInput = document.getElementById('po-project-input').value.trim();
+  if (!projectInput) { toast('Project / Job Name is required'); document.getElementById('po-project-input').focus(); return; }
   if (!poSelectedFile && !text) { toast('Choose a file or paste text first'); return; }
   show('po-processing', true);
   document.getElementById('extract-btn').disabled = true;
@@ -529,6 +531,8 @@ function removePOLine(i) {
 async function savePO() {
   const number = document.getElementById('po-number').value.trim();
   const supplier = document.getElementById('po-supplier').value.trim();
+  const project = document.getElementById('po-project-input').value.trim() || document.getElementById('po-project').value.trim();
+  if (!project) { toast('Project / Job Name is required'); document.getElementById('po-project-input').focus(); return; }
   if (!number || !supplier) { toast('PO number and supplier are required'); return; }
   if (!pendingPOLines.length) { toast('Add at least one line item'); return; }
   try {
