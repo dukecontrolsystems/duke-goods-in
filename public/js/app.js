@@ -416,7 +416,7 @@ async function savePO() {
   try {
     await api('/api/pos', 'POST', {
       number, supplier,
-      project: document.getElementById('po-project').value.trim(),
+      project: document.getElementById('po-project-input').value.trim() || document.getElementById('po-project').value.trim(),
       expected_date: document.getElementById('po-expected').value,
       lines: pendingPOLines
     });
