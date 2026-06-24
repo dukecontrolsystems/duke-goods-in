@@ -88,10 +88,34 @@ function loadHome() {
 }
 
 // ── File selection ─────────────────────────────────────
-function addFile(e) {
+async function compressImage(file) {
+  // Only compress images, not PDFs or text
+  if (!file.type.startsWith('image/')) return file;
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 1400;
+      let w = img.width, h = img.height;
+      if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => {
+        resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }));
+      }, 'image/jpeg', 0.75);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
+async function addFile(e) {
   const file = e.target.files[0];
   if (!file) return;
-  selectedFiles.push(file);
+  const compressed = await compressImage(file);
+  selectedFiles.push(compressed);
   renderFileList();
   document.getElementById('camera-input').value = '';
   document.getElementById('file-input').value = '';
