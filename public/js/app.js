@@ -394,16 +394,28 @@ async function loadOrders() {
     const expanded = expandedPOs[po.id];
     const total = po.lines.length;
 
-    // Calculate received from deliveries
+    // Calculate received from deliveries — use cumulative state per line
     const poDels = deliveries.filter(d => d.po_id === po.id);
-    let received = 0, missing = 0;
+    const hasDels = poDels.length > 0;
+
+    // Build a map of total received per line description
+    const lineReceivedMap = {};
     poDels.forEach(d => (d.lines||[]).forEach(l => {
-      if (l.status === 'ok') received++;
-      else if (l.status === 'missing') missing++;
+      const key = l.po_line_id || l.description;
+      if (!lineReceivedMap[key]) lineReceivedMap[key] = 0;
+      lineReceivedMap[key] += (l.received || 0);
     }));
+
+    // Count against PO lines
+    let received = 0, missing = 0;
+    po.lines.forEach(pol => {
+      const key = pol.id || pol.description;
+      const recvd = lineReceivedMap[key] || lineReceivedMap[pol.description] || 0;
+      if (recvd >= pol.quantity) received++;
+      else if (hasDels && recvd === 0) missing++;
+    });
     const outstanding = total - received;
     const pct = total > 0 ? Math.round(received / total * 100) : 0;
-    const hasDels = poDels.length > 0;
 
     const progressBar = hasDels ? `
       <div style="margin-top:6px">
