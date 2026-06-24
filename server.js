@@ -141,7 +141,16 @@ app.post('/api/match-delivery', requireAuth, upload.single('file'), async (req, 
 
     const openPOs = db.prepare("SELECT * FROM purchase_orders WHERE status != 'complete'").all();
     openPOs.forEach(po => { po.lines = db.prepare('SELECT * FROM po_lines WHERE po_id=?').all(po.id); });
-    if (!openPOs.length) return res.status(400).json({ error: 'No open purchase orders on file' });
+    if (!openPOs.length) {
+      return res.json({
+        matchedPOId: '', confidence: 'low',
+        matchReason: 'No open purchase orders on file',
+        dnNumber: '', carrier: '', deliveryDate: '',
+        lines: [], unmatchedDelivered: [],
+        summary: 'No POs to match against — saved as unmatched',
+        imagePath: null
+      });
+    }
 
     const poIndex = JSON.stringify(openPOs.map(p => ({
       id: p.id, number: p.number, supplier: p.supplier, project: p.project,
