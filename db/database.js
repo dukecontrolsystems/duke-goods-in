@@ -94,11 +94,13 @@ try {
 }
 
 // Seed default users
-db.prepare('DELETE FROM users').run();
-db.prepare("INSERT INTO users (name, pin, role) VALUES ('Stephen','1234','admin')").run();
-db.prepare("INSERT INTO users (name, pin, role) VALUES ('Nick','2345','staff')").run();
-db.prepare("INSERT INTO users (name, pin, role) VALUES ('Rob','3456','staff')").run();
-db.prepare("INSERT INTO users (name, pin, role) VALUES ('Site Staff','0000','staff')").run();
-console.log('Users seeded');
+const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();
+if (userCount.c === 0) {
+  db.prepare("INSERT INTO users (name, pin, role) VALUES ('Stephen','1234','admin')").run();
+  db.prepare("INSERT INTO users (name, pin, role) VALUES ('Nick','2345','staff')").run();
+  db.prepare("INSERT INTO users (name, pin, role) VALUES ('Rob','3456','staff')").run();
+  db.prepare("INSERT INTO users (name, pin, role) VALUES ('Site Staff','0000','staff')").run();
+  console.log('Users seeded');
+}
 
 module.exports = db;
