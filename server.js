@@ -16,7 +16,7 @@ if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-  filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname.replace(/\s/g, '_'))
+  filename: (req, file, cb) => cb(null, Date.now() + '-' + Math.random().toString(36).slice(2) + '-' + file.originalname.replace(/\s/g, '_'))
 });
 const upload = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 } });
 
@@ -148,7 +148,7 @@ For project: extract any project name, job number or reference. Return empty str
 });
 
 // ─── AI MATCH DELIVERY NOTE ─────────────────────────────
-app.post('/api/match-delivery', requireAuth, upload.single('file'), async (req, res) => {
+app.post('/api/match-delivery', requireAuth, upload.array('file', 10), async (req, res) => {
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set' });
@@ -189,20 +189,25 @@ Rules: match part number first then description; ok=received>=ordered; short=0<r
 
     let userContent;
     let imagePath = null;
+    const files = req.files || [];
 
-    if (req.file) {
-      const fileData = fs.readFileSync(req.file.path);
-      const b64 = fileData.toString('base64');
-      const mime = req.file.mimetype;
-      imagePath = req.file.filename;
-      const type = mime === 'application/pdf' ? 'document' : 'image';
-      const src = mime === 'application/pdf'
-        ? { type: 'base64', media_type: 'application/pdf', data: b64 }
-        : { type: 'base64', media_type: mime, data: b64 };
+    if (files.length > 0) {
+      const fileBlocks = files.map(f => {
+        const fileData = fs.readFileSync(f.path);
+        const b64 = fileData.toString('base64');
+        const mime = f.mimetype;
+        const type = mime === 'application/pdf' ? 'document' : 'image';
+        const src = mime === 'application/pdf'
+          ? { type: 'base64', media_type: 'application/pdf', data: b64 }
+          : { type: 'base64', media_type: mime, data: b64 };
+        return { type, source: src };
+      });
+      imagePath = files.map(f => f.filename).join(',');
       userContent = [
-        { type, source: src },
-        { type: 'text', text: `Open purchase orders:\n${poIndex}\n\nIdentify which PO this delivery note belongs to and match all items.` }
+        ...fileBlocks,
+        { type: 'text', text: `Open purchase orders:\n${poIndex}\n\nThe above ${files.length > 1 ? files.length + ' images/pages are all part of the same delivery note' : 'document is a delivery note'}. Identify which PO it belongs to and match all items.` }
       ];
+      files.forEach(f => { try { fs.unlinkSync(f.path); } catch(e) {} });
     } else {
       const text = req.body.text || '';
       if (!text) return res.status(400).json({ error: 'No file or text provided' });
