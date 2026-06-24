@@ -112,7 +112,26 @@ async function processDelivery() {
     else fd.append('text', text);
 
     setMsg('Matching against purchase orders…');
-    const result = await apiFD('/api/match-delivery', fd);
+    let result;
+    try {
+      result = await apiFD('/api/match-delivery', fd);
+    } catch(e) {
+      // If no POs exist, save as unmatched directly
+      if (e.message && e.message.includes('No open purchase orders')) {
+        show('receive-processing', false);
+        show('receive-upload-panel', true);
+        await api('/api/deliveries', 'POST', {
+          po_id: '', po_number: '', supplier: '', project: '',
+          delivery_date: today(), carrier: '', dn_ref: '',
+          status: 'unmatched', lines: [], unmatched: [],
+          image_path: '', ai_summary: 'No POs on file to match against'
+        });
+        toast('Saved to Unmatched — add a PO to match it');
+        updateUnmatchedCount();
+        return;
+      }
+      throw e;
+    }
     matchResult = result;
 
     const pos = await api('/api/pos');
