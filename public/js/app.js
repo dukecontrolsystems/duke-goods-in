@@ -413,17 +413,38 @@ async function loadOrders() {
         <div style="font-size:11px;color:#888;margin-top:3px">${received}/${total} lines received · ${outstanding} outstanding${missing ? ` · <span style="color:#791F1F">${missing} missing</span>` : ''}</div>
       </div>` : '';
 
+    // Build received map from deliveries for this PO
+    const receivedMap = {};
+    poDels.forEach(d => (d.lines||[]).forEach(l => {
+      const key = l.po_line_id || l.description;
+      if (!receivedMap[key]) receivedMap[key] = 0;
+      if (l.status === 'ok' || l.status === 'short') receivedMap[key] += (l.received || 0);
+    }));
+
     const lineRows = expanded ? `
       <div style="border-top:1px solid #f0f0f0;margin-top:8px;padding-top:8px">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#888;margin-bottom:6px">Line items</div>
-        ${po.lines.map(l => `
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f8f8f8;font-size:13px">
+        <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#888;margin-bottom:6px;padding:0 4px">
+          <span>Item</span><span style="text-align:center">Ordered</span><span style="text-align:center">Received</span><span style="text-align:center">Status</span>
+        </div>
+        ${po.lines.map(l => {
+          const recvd = receivedMap[l.id] || receivedMap[l.description] || 0;
+          const ordered = l.quantity;
+          const done = recvd >= ordered;
+          const partial = recvd > 0 && recvd < ordered;
+          const none = recvd === 0;
+          const statusColor = done ? '#27500A' : partial ? '#BA7517' : '#888';
+          const statusLabel = done ? '✓ OK' : partial ? 'Part' : poDels.length ? '✗ Missing' : '—';
+          const rowBg = done ? '#f9fdf5' : partial ? '#fffbf5' : poDels.length ? '#fff8f8' : '';
+          return `<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:4px;align-items:center;padding:7px 4px;border-bottom:1px solid #f5f5f5;font-size:13px;background:${rowBg}">
             <div>
               <div style="font-weight:500">${esc(l.description)}</div>
               ${l.part_number ? `<div style="font-size:11px;color:#888">${esc(l.part_number)}</div>` : ''}
             </div>
-            <div style="font-weight:700;flex-shrink:0;margin-left:12px">Qty: ${l.quantity}${l.unit ? ' ' + esc(l.unit) : ''}</div>
-          </div>`).join('')}
+            <div style="text-align:center;font-weight:600;min-width:52px">${ordered}${l.unit ? ' ' + esc(l.unit) : ''}</div>
+            <div style="text-align:center;font-weight:600;min-width:52px;color:${recvd>0?'#0F2D52':'#aaa'}">${recvd > 0 ? recvd : '—'}</div>
+            <div style="text-align:center;font-weight:700;min-width:52px;color:${statusColor}">${statusLabel}</div>
+          </div>`;
+        }).join('')}
       </div>` : '';
 
     return `<div class="list-card">
