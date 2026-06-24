@@ -43,6 +43,7 @@ function showApp(user) {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.getElementById('nav-user').textContent = user.name;
+  goTab('home');
   try { setTimeout(updateUnmatchedCount, 1000); } catch(e) {}
 }
 
@@ -64,6 +65,26 @@ function goTab(name) {
   if (name === 'orders') loadOrders();
   if (name === 'history') loadHistory();
   if (name === 'unmatched') loadUnmatched();
+  if (name === 'home') loadHome();
+}
+
+function loadHome() {
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const el = document.getElementById('home-greeting');
+  if (el) el.textContent = greeting + (currentUser ? ', ' + currentUser.name : '');
+  // Sync unmatched badge
+  api('/api/unmatched').then(items => {
+    const badge = document.getElementById('home-unmatched-badge');
+    const tabBadge = document.getElementById('unmatched-count');
+    if (items.length > 0) {
+      if (badge) { badge.textContent = items.length; badge.style.display = 'inline'; }
+      if (tabBadge) { tabBadge.textContent = items.length; tabBadge.style.display = 'inline'; }
+    } else {
+      if (badge) badge.style.display = 'none';
+      if (tabBadge) tabBadge.style.display = 'none';
+    }
+  }).catch(() => {});
 }
 
 // ── File selection ─────────────────────────────────────
