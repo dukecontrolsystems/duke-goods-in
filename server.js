@@ -43,7 +43,11 @@ function uid() {
 // ─── AUTH ───────────────────────────────────────────────
 app.post('/api/login', (req, res) => {
   const { name, pin } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE LOWER(name)=LOWER(?) AND pin=?').get(name, pin);
+  console.log('Login attempt:', name, pin);
+  const allUsers = db.prepare('SELECT name, pin FROM users').all();
+  console.log('All users in DB:', JSON.stringify(allUsers));
+  const user = db.prepare('SELECT * FROM users WHERE LOWER(name)=LOWER(?) AND pin=? LIMIT 1').get(name, pin);
+  console.log('Found user:', user ? user.name : 'none');
   if (!user) return res.status(401).json({ error: 'Invalid name or PIN' });
   req.session.user = { id: user.id, name: user.name, role: user.role };
   res.json({ ok: true, user: req.session.user });
