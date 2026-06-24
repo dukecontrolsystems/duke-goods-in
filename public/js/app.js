@@ -516,7 +516,10 @@ async function loadHistory() {
           <div class="list-card-sub">${projTag}${d.delivery_date || '—'} · ${d.carrier || '—'} · DN: ${d.dn_ref || '—'}</div>
           <div class="list-card-sub">Received by: ${esc(d.received_by || '—')}</div>
         </div>
-        <span class="badge ${issues ? 'badge-missing' : 'badge-ok'}">${issues ? issues + ' issue' + (issues > 1 ? 's' : '') : 'All OK'}</span>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <span class="badge ${issues ? 'badge-missing' : 'badge-ok'}">${issues ? issues + ' issue' + (issues > 1 ? 's' : '') : 'All OK'}</span>
+          <button class="btn btn-ghost btn-sm" onclick="deleteDelivery('${d.id}')" style="color:#E24B4A;padding:4px 8px">🗑</button>
+        </div>
       </div>
       <div class="results-table-wrap" style="margin-top:8px">
         <table class="results-table">
@@ -627,6 +630,15 @@ async function deleteUnmatched(id) {
   loadUnmatched();
 }
 
+
+async function deleteDelivery(id) {
+  if (!confirm('Delete this delivery record? This cannot be undone.')) return;
+  try {
+    await api('/api/deliveries/' + id, 'DELETE');
+    toast('Delivery deleted');
+    loadHistory();
+  } catch(e) { toast('Error: ' + e.message); }
+}
 
 function exportCSV() {
   api('/api/deliveries').then(deliveries => {
