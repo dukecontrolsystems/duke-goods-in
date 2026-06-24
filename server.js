@@ -261,6 +261,17 @@ app.get('/api/deliveries', requireAuth, (req, res) => {
   res.json(deliveries);
 });
 
+app.delete('/api/deliveries/:id', requireAuth, (req, res) => {
+  try {
+    db.prepare('DELETE FROM delivery_lines WHERE delivery_id=?').run(req.params.id);
+    db.prepare('DELETE FROM deliveries WHERE id=?').run(req.params.id);
+    res.json({ ok: true });
+  } catch(e) {
+    console.error('delete delivery error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ─── PROJECTS ───────────────────────────────────────────
 app.get('/api/projects', requireAuth, (req, res) => {
   const pos = db.prepare('SELECT * FROM purchase_orders').all();
