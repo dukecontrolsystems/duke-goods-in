@@ -245,6 +245,12 @@ async function confirmDelivery() {
   if (!matchResult) return toast('Process a delivery note first');
   const isUnmatched = !matchedPO;
   try {
+    // Warn if no DN ref — duplicate detection won't work without one
+    const dnRef = document.getElementById('recv-dn').value.trim();
+    if (!dnRef) {
+      const go = confirm('No delivery note number entered. Without one we cannot detect duplicates. Continue anyway?');
+      if (!go) return;
+    }
     await api('/api/deliveries', 'POST', {
       po_id: matchedPO?.id || '',
       po_number: matchedPO?.number || '',
@@ -267,7 +273,11 @@ async function confirmDelivery() {
     }
     resetReceive();
   } catch (e) {
-    toast('Error saving delivery: ' + e.message);
+    if (e.message && e.message.includes('Duplicate delivery note')) {
+      alert('⚠️ ' + e.message);
+    } else {
+      toast('Error saving delivery: ' + e.message);
+    }
   }
 }
 
