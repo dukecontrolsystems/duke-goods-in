@@ -50,7 +50,11 @@
 
   <!-- Bottom tab bar -->
   <nav class="tab-bar">
-    <button class="tab-item active" onclick="goTab('receive')" id="tab-receive-btn">
+    <button class="tab-item active" onclick="goTab('home')" id="tab-home-btn">
+      <span class="tab-icon">🏠</span>
+      <span class="tab-label">Home</span>
+    </button>
+    <button class="tab-item" onclick="goTab('receive')" id="tab-receive-btn">
       <span class="tab-icon">📦</span>
       <span class="tab-label">Receive</span>
     </button>
@@ -75,8 +79,51 @@
   <!-- Main content -->
   <main class="main-content">
 
+    <!-- ═══ HOME ═══ -->
+    <section id="tab-home" class="tab-section active">
+      <div style="padding:1.5rem 0 1rem">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+          <span class="logo-badge">DCS</span>
+          <div>
+            <div style="font-size:18px;font-weight:700;color:#0F2D52">Goods-In</div>
+            <div id="home-greeting" style="font-size:13px;color:#888"></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <button class="home-card" onclick="goTab('orders');showAddPO()">
+          <span class="home-card-icon">📋</span>
+          <span class="home-card-title">Add Purchase Order</span>
+          <span class="home-card-sub">Upload a PO or order confirmation</span>
+        </button>
+        <button class="home-card home-card-primary" onclick="goTab('receive')">
+          <span class="home-card-icon">📦</span>
+          <span class="home-card-title">Log a Delivery</span>
+          <span class="home-card-sub">Photo or upload a delivery note</span>
+        </button>
+        <button class="home-card" onclick="goTab('projects')">
+          <span class="home-card-icon">📁</span>
+          <span class="home-card-title">Projects</span>
+          <span class="home-card-sub">Materials received vs outstanding</span>
+        </button>
+        <button class="home-card" onclick="goTab('unmatched')">
+          <span class="home-card-icon">⚠️</span>
+          <span class="home-card-title">Unmatched <span id="home-unmatched-badge" style="display:none;background:#E24B4A;color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;margin-left:4px;vertical-align:middle"></span></span>
+          <span class="home-card-sub">Deliveries needing a PO linked</span>
+        </button>
+      </div>
+      <button class="home-card" style="width:100%;flex-direction:row;gap:16px;justify-content:flex-start;padding:1rem 1.25rem" onclick="goTab('history')">
+        <span class="home-card-icon" style="font-size:24px">🕓</span>
+        <div style="text-align:left">
+          <div class="home-card-title">Delivery History</div>
+          <div class="home-card-sub">View and export all past deliveries</div>
+        </div>
+      </button>
+    </section>
+
     <!-- ═══ RECEIVE ═══ -->
-    <section id="tab-receive" class="tab-section active">
+    <section id="tab-receive" class="tab-section">
       <div class="page-header">
         <h2>Receive delivery</h2>
         <p class="page-sub">Upload or photograph a delivery note — AI matches it automatically</p>
