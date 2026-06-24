@@ -233,6 +233,15 @@ Rules: match part number first then description; ok=received>=ordered; short=0<r
 app.post('/api/deliveries', requireAuth, (req, res) => {
   try {
     const { po_id, po_number, supplier, project, delivery_date, carrier, dn_ref, status, lines, unmatched, image_path, ai_summary } = req.body;
+
+    // Duplicate check — if DN ref provided, check it hasn't been saved before
+    if (dn_ref && dn_ref.trim()) {
+      const existing = db.prepare("SELECT id FROM deliveries WHERE dn_ref=? AND status='complete'").get(dn_ref.trim());
+      if (existing) {
+        return res.status(409).json({ error: `Duplicate delivery note: DN reference "${dn_ref}" has already been recorded. If this is a different delivery, clear the DN number field and try again.` });
+      }
+    }
+
     const id = uid();
     db.prepare('INSERT INTO deliveries (id, po_id, po_number, supplier, project, delivery_date, carrier, dn_ref, status, received_by, image_path, ai_summary) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
       .run(id, po_id || null, po_number || '', supplier || '', project || '', delivery_date || '', carrier || '', dn_ref || '', status || 'complete', req.session.user.name, image_path || '', ai_summary || '');
@@ -251,8 +260,27 @@ app.post('/api/deliveries', requireAuth, (req, res) => {
     });
     db.pragma('foreign_keys = ON');
 
-    if (po_id && (lines || []).every(l => l.status === 'ok')) {
-      db.prepare("UPDATE purchase_orders SET status='complete' WHERE id=?").run(po_id);
+    // Check if PO is fully received by comparing cumulative received vs PO ordered quantities
+    if (po_id) {
+      const poLines = db.prepare('SELECT * FROM po_lines WHERE po_id=?').all(po_id);
+      if (poLines.length > 0) {
+        const allComplete = poLines.every(pol => {
+          // Sum received quantities across all complete deliveries for this PO line
+          const result = db.prepare(`
+            SELECT COALESCE(SUM(dl.received), 0) as total_received
+            FROM delivery_lines dl
+            JOIN deliveries d ON dl.delivery_id = d.id
+            WHERE d.po_id = ? AND d.status = 'complete'
+            AND (dl.po_line_id = ? OR dl.description = ?)
+          `).get(po_id, pol.id, pol.description);
+          return result.total_received >= pol.quantity;
+        });
+        if (allComplete) {
+          db.prepare("UPDATE purchase_orders SET status='complete' WHERE id=?").run(po_id);
+        } else {
+          db.prepare("UPDATE purchase_orders SET status='open' WHERE id=?").run(po_id);
+        }
+      }
     }
     res.json({ ok: true, id });
   } catch(e) {
