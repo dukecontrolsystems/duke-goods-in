@@ -433,7 +433,7 @@ async function loadOrders() {
           const partial = recvd > 0 && recvd < ordered;
           const none = recvd === 0;
           const statusColor = done ? '#27500A' : partial ? '#BA7517' : '#888';
-          const statusLabel = done ? '✓ OK' : partial ? 'Part' : poDels.length ? '✗ Missing' : '—';
+          const statusLabel = done ? 'Received' : partial ? 'Partial' : poDels.length ? 'Missing' : '—';
           const rowBg = done ? '#f9fdf5' : partial ? '#fffbf5' : poDels.length ? '#fff8f8' : '';
           return `<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:4px;align-items:center;padding:7px 4px;border-bottom:1px solid #f5f5f5;font-size:13px;background:${rowBg}">
             <div>
@@ -631,22 +631,26 @@ async function loadHistory() {
   el.innerHTML = '';
   const deliveries = await api('/api/deliveries');
   if (!deliveries.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">🕓</div><div class="empty-text">No confirmed deliveries yet.</div></div>'; return; }
-  const bdg = {
-    ok: '<span class="badge badge-ok">OK</span>',
-    short: '<span class="badge badge-short">Short</span>',
-    missing: '<span class="badge badge-missing">Missing</span>',
-    unexpected: '<span class="badge badge-pending">Unexpected</span>'
-  };
   el.innerHTML = deliveries.map(d => {
     const issues = (d.lines || []).filter(l => l.status !== 'ok').length;
     const projTag = d.project ? `<span class="badge badge-blue" style="font-size:11px;margin-right:4px">${esc(d.project)}</span>` : '';
-    const lineRows = (d.lines || []).map(l => `<tr>
-      <td>${esc(l.description)}</td>
-      <td style="color:#888;font-size:12px">${esc(l.part_number) || '—'}</td>
-      <td style="text-align:center">${l.ordered}</td>
-      <td style="text-align:center;font-weight:700">${l.received}</td>
-      <td>${bdg[l.status] || ''}</td>
-    </tr>`).join('');
+    const lineRows = (d.lines || []).map(l => {
+      const done = l.status === 'ok';
+      const partial = l.status === 'short';
+      const missing = l.status === 'missing';
+      const rowBg = done ? '#f9fdf5' : partial ? '#fffbf5' : missing ? '#fff8f8' : '';
+      const statusColor = done ? '#27500A' : partial ? '#BA7517' : missing ? '#791F1F' : '#888';
+      const statusLabel = done ? 'Received' : partial ? 'Partial' : missing ? 'Missing' : l.status;
+      return `<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:4px;align-items:center;padding:7px 4px;border-bottom:1px solid #f5f5f5;font-size:13px;background:${rowBg}">
+        <div>
+          <div style="font-weight:500">${esc(l.description)}</div>
+          ${l.part_number ? `<div style="font-size:11px;color:#888">${esc(l.part_number)}</div>` : ''}
+        </div>
+        <div style="text-align:center;font-weight:600;min-width:52px">${l.ordered}</div>
+        <div style="text-align:center;font-weight:600;min-width:52px;color:${l.received>0?'#0F2D52':'#aaa'}">${l.received > 0 ? l.received : '—'}</div>
+        <div style="text-align:center;font-weight:700;min-width:52px;color:${statusColor}">${statusLabel}</div>
+      </div>`;
+    }).join('');
     return `<div class="list-card">
       <div class="list-card-header">
         <div>
@@ -659,11 +663,11 @@ async function loadHistory() {
           <button class="btn btn-ghost btn-sm" onclick="deleteDelivery('${d.id}')" style="color:#E24B4A;padding:4px 8px">🗑</button>
         </div>
       </div>
-      <div class="results-table-wrap" style="margin-top:8px">
-        <table class="results-table">
-          <thead><tr><th>Item</th><th>P/N</th><th>Ord</th><th>Rcvd</th><th>Status</th></tr></thead>
-          <tbody>${lineRows}</tbody>
-        </table>
+      <div style="margin-top:8px">
+        <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#888;margin-bottom:4px;padding:0 4px">
+          <span>Item</span><span style="text-align:center;min-width:52px">Ordered</span><span style="text-align:center;min-width:52px">Received</span><span style="text-align:center;min-width:52px">Status</span>
+        </div>
+        ${lineRows}
       </div>
     </div>`;
   }).join('');
