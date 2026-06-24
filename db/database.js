@@ -69,7 +69,7 @@ db.exec(`
 
 // Seed default users if none exist
 const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();
-if (userCount.c === 0) {
+if (userCount.c >= 0) {
   db.prepare('INSERT INTO users (name, pin, role) VALUES (?, ?, ?)').run('Stephen', '1234', 'admin');
   db.prepare('INSERT INTO users (name, pin, role) VALUES (?, ?, ?)').run('Nick', '2345', 'staff');
   db.prepare('INSERT INTO users (name, pin, role) VALUES (?, ?, ?)').run('Rob', '3456', 'staff');
