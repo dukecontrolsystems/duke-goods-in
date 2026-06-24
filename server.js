@@ -97,6 +97,12 @@ app.delete('/api/pos/:id', requireAuth, (req, res) => {
   }
 });
 
+// ─── PROJECT NAMES ──────────────────────────────────────
+app.get('/api/project-names', requireAuth, (req, res) => {
+  const rows = db.prepare("SELECT DISTINCT project FROM purchase_orders WHERE project != '' AND project IS NOT NULL ORDER BY project ASC").all();
+  res.json(rows.map(r => r.project));
+});
+
 // ─── AI EXTRACT PO ──────────────────────────────────────
 app.post('/api/extract-po', requireAuth, upload.single('file'), async (req, res) => {
   try {
