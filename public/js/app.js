@@ -296,6 +296,8 @@ function toggleProject(name) {
 }
 
 // ── ORDERS ─────────────────────────────────────────────
+let expandedPOs = {};
+
 async function loadOrders() {
   const el = document.getElementById('orders-list');
   el.innerHTML = '';
@@ -303,19 +305,39 @@ async function loadOrders() {
   if (!pos.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">No purchase orders yet.<br>Add one above to get started.</div></div>'; return; }
   el.innerHTML = pos.map(po => {
     const projTag = po.project ? `<span class="badge badge-blue" style="font-size:11px">${esc(po.project)}</span> ` : '';
+    const expanded = expandedPOs[po.id];
+    const lineRows = expanded ? `
+      <div style="border-top:1px solid #f0f0f0;margin-top:8px;padding-top:8px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#888;margin-bottom:6px">Line items</div>
+        ${po.lines.map(l => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f8f8f8;font-size:13px">
+            <div>
+              <div style="font-weight:500">${esc(l.description)}</div>
+              ${l.part_number ? `<div style="font-size:11px;color:#888">${esc(l.part_number)}</div>` : ''}
+            </div>
+            <div style="font-weight:700;flex-shrink:0;margin-left:12px">Qty: ${l.quantity}${l.unit ? ' ' + esc(l.unit) : ''}</div>
+          </div>`).join('')}
+      </div>` : '';
     return `<div class="list-card">
-      <div class="list-card-header">
-        <div>
+      <div class="list-card-header" onclick="togglePO('${po.id}')" style="cursor:pointer">
+        <div style="flex:1;min-width:0">
           <div class="list-card-title">${esc(po.number)} — ${esc(po.supplier)}</div>
           <div class="list-card-sub">${projTag}${po.lines.length} line${po.lines.length !== 1 ? 's' : ''} · Expected: ${po.expected_date || '—'}</div>
         </div>
-        <div class="list-card-actions">
+        <div class="list-card-actions" onclick="event.stopPropagation()">
           <span class="badge ${po.status === 'complete' ? 'badge-ok' : 'badge-pending'}">${po.status === 'complete' ? 'Complete' : 'Open'}</span>
+          <span style="color:#aaa;font-size:18px;transition:transform .2s;display:inline-block;${expanded ? 'transform:rotate(180deg)' : ''}">⌄</span>
           <button class="btn btn-ghost btn-sm" onclick="deletePO('${po.id}')">🗑</button>
         </div>
       </div>
+      ${lineRows}
     </div>`;
   }).join('');
+}
+
+function togglePO(id) {
+  expandedPOs[id] = !expandedPOs[id];
+  loadOrders();
 }
 
 function showAddPO() {
@@ -327,14 +349,13 @@ function cancelAddPO() {
   document.getElementById('po-form').style.display = 'none';
   document.getElementById('extract-btn').style.display = 'block';
   document.getElementById('po-text').value = '';
+  document.getElementById('po-project-input').value = '';
   clearPOFile();
   pendingPOLines = [];
 }
 
 async function extractPO() {
   const text = document.getElementById('po-text').value.trim();
-  const projectInput = document.getElementById('po-project-input').value.trim();
-  if (!projectInput) { toast('Please enter a project / job name first'); return; }
   if (!poSelectedFile && !text) { toast('Choose a file or paste text first'); return; }
   show('po-processing', true);
   document.getElementById('extract-btn').disabled = true;
@@ -349,7 +370,7 @@ async function extractPO() {
     }
     document.getElementById('po-number').value = result.number || '';
     document.getElementById('po-supplier').value = result.supplier || '';
-    document.getElementById('po-project').value = result.project || '';
+    document.getElementById('po-project').value = document.getElementById('po-project-input').value.trim() || result.project || '';
     document.getElementById('po-expected').value = result.expected_date || '';
     pendingPOLines = (result.lines || []).map((l, i) => ({ ...l, _id: i }));
     renderPOLines();
