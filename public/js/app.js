@@ -407,12 +407,13 @@ async function loadOrders() {
     }));
 
     // Count against PO lines
-    let received = 0, missing = 0;
+    let received = 0, missing = 0, partial = 0;
     po.lines.forEach(pol => {
       const key = pol.id || pol.description;
       const recvd = lineReceivedMap[key] || lineReceivedMap[pol.description] || 0;
       if (recvd >= pol.quantity) received++;
       else if (hasDels && recvd === 0) missing++;
+      else if (hasDels && recvd > 0) partial++;
     });
     const outstanding = total - received;
     const pct = total > 0 ? Math.round(received / total * 100) : 0;
@@ -422,7 +423,7 @@ async function loadOrders() {
         <div style="height:5px;background:#eee;border-radius:4px;overflow:hidden;width:100%">
           <div style="height:100%;background:${pct===100?'#3B6D11':missing?'#BA7517':'#0F2D52'};border-radius:4px;width:${pct}%"></div>
         </div>
-        <div style="font-size:11px;color:#888;margin-top:3px">${received}/${total} lines received · ${outstanding} outstanding${missing ? ` · <span style="color:#791F1F">${missing} missing</span>` : ''}</div>
+        <div style="font-size:11px;color:#888;margin-top:3px">${received}/${total} lines received${missing ? ` · <span style="color:#791F1F">${missing} missing</span>` : ''}${partial ? ` · <span style="color:#BA7517">${partial} partially received</span>` : ''}</div>
       </div>` : '';
 
     // Build received map from deliveries for this PO
