@@ -392,9 +392,18 @@ function togglePO(id) {
   loadOrders();
 }
 
+async function loadProjectSuggestions() {
+  try {
+    const names = await api('/api/project-names');
+    const dl = document.getElementById('project-suggestions');
+    if (dl) dl.innerHTML = names.map(n => `<option value="${n.replace(/"/g,'&quot;')}">`).join('');
+  } catch(e) {}
+}
+
 function showAddPO() {
   document.getElementById('add-po-panel').style.display = 'block';
   document.getElementById('add-po-panel').scrollIntoView({ behavior: 'smooth' });
+  loadProjectSuggestions();
 }
 function cancelAddPO() {
   document.getElementById('add-po-panel').style.display = 'none';
