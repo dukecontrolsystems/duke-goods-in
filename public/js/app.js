@@ -43,6 +43,7 @@ function showApp(user) {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.getElementById('nav-user').textContent = user.name;
+  setTimeout(updateUnmatchedCount, 500);
 }
 
 async function logout() {
@@ -51,6 +52,9 @@ async function logout() {
 }
 
 // ── Tabs ───────────────────────────────────────────────
+// Check unmatched count on load
+setTimeout(updateUnmatchedCount, 1000);
+
 function goTab(name) {
   document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.tab-item').forEach(b => b.classList.remove('active'));
@@ -59,6 +63,7 @@ function goTab(name) {
   if (name === 'projects') loadProjects();
   if (name === 'orders') loadOrders();
   if (name === 'history') loadHistory();
+  if (name === 'unmatched') loadUnmatched();
 }
 
 // ── File selection ─────────────────────────────────────
@@ -198,22 +203,28 @@ function renderMatchResults() {
 
 async function confirmDelivery() {
   if (!matchResult) return toast('Process a delivery note first');
+  const isUnmatched = !matchedPO;
   try {
     await api('/api/deliveries', 'POST', {
       po_id: matchedPO?.id || '',
-      po_number: matchedPO?.number || 'Unknown',
-      supplier: matchedPO?.supplier || 'Unknown',
+      po_number: matchedPO?.number || '',
+      supplier: matchedPO?.supplier || matchResult.supplierGuess || '',
       project: matchedPO?.project || '',
       delivery_date: document.getElementById('recv-date').value,
       carrier: document.getElementById('recv-carrier').value,
       dn_ref: document.getElementById('recv-dn').value,
-      status: 'complete',
+      status: isUnmatched ? 'unmatched' : 'complete',
       lines: matchResult.lines || [],
       unmatched: matchResult.unmatchedDelivered || [],
       image_path: matchResult.imagePath || '',
       ai_summary: matchResult.summary || ''
     });
-    toast('Delivery confirmed ✓');
+    if (isUnmatched) {
+      toast('Saved to Unmatched deliveries — link a PO to action it');
+      updateUnmatchedCount();
+    } else {
+      toast('Delivery confirmed ✓');
+    }
     resetReceive();
   } catch (e) {
     toast('Error saving delivery: ' + e.message);
@@ -477,6 +488,106 @@ async function loadHistory() {
   }).join('');
 }
 
+// ── UNMATCHED ──────────────────────────────────────────
+async function updateUnmatchedCount() {
+  try {
+    const items = await api('/api/unmatched');
+    const badge = document.getElementById('unmatched-count');
+    if (items.length > 0) {
+      badge.textContent = items.length;
+      badge.style.display = 'inline';
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch(e) {}
+}
+
+async function loadUnmatched() {
+  const el = document.getElementById('unmatched-list');
+  el.innerHTML = '<div class="processing-card"><div class="spinner"></div><span>Loading…</span></div>';
+  const items = await api('/api/unmatched');
+  updateUnmatchedCount();
+  if (!items.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-text">No unmatched deliveries.<br>Everything has been linked to a PO.</div></div>';
+    return;
+  }
+  const pos = await api('/api/pos');
+  el.innerHTML = items.map(d => {
+    const lines = d.lines || [];
+    const lineRows = lines.map(l => `
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f5f5f5;font-size:13px">
+        <div><div style="font-weight:500">${esc(l.description)}</div>${l.part_number ? `<div style="font-size:11px;color:#888">${esc(l.part_number)}</div>` : ''}</div>
+        <div style="font-weight:700;flex-shrink:0;margin-left:8px">Rcvd: ${l.received}</div>
+      </div>`).join('');
+
+    const poOptions = pos.filter(p => p.status !== 'complete')
+      .map(p => `<option value="${p.id}">${esc(p.number)} — ${esc(p.supplier)}</option>`).join('');
+
+    return `<div class="list-card" id="unmatched-${d.id}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <div>
+          <div style="font-weight:700;font-size:15px">📦 ${d.dn_ref ? 'DN: ' + esc(d.dn_ref) : 'Delivery note'}</div>
+          <div style="font-size:12px;color:#888;margin-top:2px">${d.delivery_date || '—'} · ${d.carrier || '—'} · Received by: ${esc(d.received_by || '—')}</div>
+          ${d.ai_summary ? `<div style="font-size:12px;color:#555;margin-top:4px;font-style:italic">${esc(d.ai_summary)}</div>` : ''}
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="deleteUnmatched('${d.id}')" style="color:#E24B4A;flex-shrink:0">🗑</button>
+      </div>
+
+      <div style="background:#f8f8f8;border-radius:8px;padding:10px;margin-bottom:12px;max-height:200px;overflow-y:auto">
+        ${lineRows || '<div style="color:#888;font-size:13px">No line items</div>'}
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#888;margin-bottom:6px">Link to existing PO</div>
+          <select id="link-po-${d.id}" style="width:100%;border:1.5px solid #e0e0e0;border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:6px">
+            <option value="">— select PO —</option>
+            ${poOptions}
+          </select>
+          <button class="btn btn-primary btn-full btn-sm" onclick="linkToPO('${d.id}')">🔗 Link to PO</button>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#888;margin-bottom:6px">Create new PO from this</div>
+          <input type="text" id="new-po-num-${d.id}" class="input" placeholder="PO number" style="margin-bottom:6px;font-size:13px;padding:8px 10px">
+          <input type="text" id="new-po-sup-${d.id}" class="input" placeholder="Supplier" style="margin-bottom:6px;font-size:13px;padding:8px 10px">
+          <input type="text" id="new-po-proj-${d.id}" class="input" placeholder="Project name" style="margin-bottom:6px;font-size:13px;padding:8px 10px">
+          <button class="btn btn-orange btn-full btn-sm" onclick="createPOFromUnmatched('${d.id}', ${JSON.stringify(lines.map(l => ({description: l.description, part_number: l.part_number, quantity: l.received || 1})))})">✚ Create PO</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function linkToPO(deliveryId) {
+  const poId = document.getElementById('link-po-' + deliveryId).value;
+  if (!poId) { toast('Select a PO first'); return; }
+  try {
+    await api('/api/unmatched/' + deliveryId + '/link', 'POST', { po_id: poId });
+    toast('Linked to PO ✓');
+    loadUnmatched();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function createPOFromUnmatched(deliveryId, lines) {
+  const number = document.getElementById('new-po-num-' + deliveryId).value.trim();
+  const supplier = document.getElementById('new-po-sup-' + deliveryId).value.trim();
+  const project = document.getElementById('new-po-proj-' + deliveryId).value.trim();
+  if (!number || !supplier) { toast('PO number and supplier are required'); return; }
+  try {
+    await api('/api/unmatched/' + deliveryId + '/create-po', 'POST', { number, supplier, project, lines });
+    toast('PO created and delivery linked ✓');
+    loadUnmatched();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function deleteUnmatched(id) {
+  if (!confirm('Delete this unmatched delivery? This cannot be undone.')) return;
+  await api('/api/unmatched/' + id, 'DELETE');
+  toast('Deleted');
+  loadUnmatched();
+}
+
+
 function exportCSV() {
   api('/api/deliveries').then(deliveries => {
     if (!deliveries.length) { toast('No deliveries to export'); return; }
@@ -489,31 +600,4 @@ function exportCSV() {
     a.download = 'duke-goods-in.csv';
     a.click();
   });
-}
-
-// ── Helpers ────────────────────────────────────────────
-async function api(url, method = 'GET', body) {
-  const opts = { method, headers: {} };
-  if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
-  const res = await fetch(url, opts);
-  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || res.statusText); }
-  return res.json();
-}
-
-async function apiFD(url, fd) {
-  const res = await fetch(url, { method: 'POST', body: fd });
-  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || res.statusText); }
-  return res.json();
-}
-
-function show(id, visible) {
-  document.getElementById(id).style.display = visible ? 'block' : 'none';
-}
-function setMsg(msg) { document.getElementById('processing-msg').textContent = msg; }
-function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
-function today() { return new Date().toISOString().slice(0, 10); }
-function toast(msg, dur = 2800) {
-  const el = document.getElementById('toast');
-  el.textContent = msg; el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), dur);
 }
