@@ -2,7 +2,7 @@
 let currentUser = null;
 let matchResult = null;
 let matchedPO = null;
-let selectedFile = null;
+let selectedFiles = [];  // supports multiple pages
 let poSelectedFile = null;
 let pendingPOLines = [];
 let expandedProjects = {};
@@ -88,18 +88,40 @@ function loadHome() {
 }
 
 // ── File selection ─────────────────────────────────────
-function fileSelected(e) {
+function addFile(e) {
   const file = e.target.files[0];
   if (!file) return;
-  selectedFile = file;
-  document.getElementById('file-preview').style.display = 'flex';
-  document.getElementById('file-preview-name').textContent = '✓ ' + file.name;
-}
-function clearFile() {
-  selectedFile = null;
-  document.getElementById('file-preview').style.display = 'none';
+  selectedFiles.push(file);
+  renderFileList();
   document.getElementById('camera-input').value = '';
   document.getElementById('file-input').value = '';
+}
+
+function removeFile(idx) {
+  selectedFiles.splice(idx, 1);
+  renderFileList();
+}
+
+function renderFileList() {
+  const el = document.getElementById('file-list');
+  const btn = document.getElementById('add-another-btn');
+  if (!selectedFiles.length) {
+    el.innerHTML = '';
+    btn.style.display = 'none';
+    return;
+  }
+  el.innerHTML = selectedFiles.map((f, i) =>
+    `<div class="file-preview" style="margin-bottom:4px">
+      <span>✓ ${f.name}</span>
+      <button class="btn-clear" onclick="removeFile(${i})">✕</button>
+    </div>`
+  ).join('');
+  btn.style.display = 'block';
+}
+
+function clearFile() {
+  selectedFiles = [];
+  renderFileList();
 }
 function poFileSelected(e) {
   const file = e.target.files[0];
@@ -118,7 +140,7 @@ function clearPOFile() {
 // ── RECEIVE ────────────────────────────────────────────
 async function processDelivery() {
   const text = document.getElementById('dn-text').value.trim();
-  if (!selectedFile && !text) {
+  if (!selectedFiles.length && !text) {
     toast('Take a photo or paste delivery note text first');
     return;
   }
@@ -129,8 +151,9 @@ async function processDelivery() {
 
   try {
     const fd = new FormData();
-    if (selectedFile) fd.append('file', selectedFile);
-    else fd.append('text', text);
+    if (selectedFiles.length > 0) {
+      selectedFiles.forEach((f, i) => fd.append('file', f));
+    } else fd.append('text', text);
 
     setMsg('Matching against purchase orders…');
     let result;
@@ -282,7 +305,7 @@ async function confirmDelivery() {
 }
 
 function resetReceive() {
-  matchResult = null; matchedPO = null; selectedFile = null;
+  matchResult = null; matchedPO = null; selectedFiles = [];
   show('receive-upload-panel', true);
   show('receive-processing', false);
   show('receive-results', false);
