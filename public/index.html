@@ -246,7 +246,8 @@
         <textarea id="po-text" class="textarea" placeholder="Paste PO or quote text…" rows="3"></textarea>
         <div class="form-group" style="margin-top:.75rem">
           <label>Project / job name</label>
-          <input type="text" id="po-project-input" class="input" placeholder="e.g. JLR Ship to Paint, Rivian VC">
+          <input type="text" id="po-project-input" class="input" placeholder="e.g. JLR Ship to Paint" list="project-suggestions" autocomplete="off">
+          <datalist id="project-suggestions"></datalist>
         </div>
         <div id="po-processing" style="display:none" class="processing-card sm">
           <div class="spinner sm"></div>
