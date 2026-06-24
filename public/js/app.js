@@ -386,11 +386,33 @@ let expandedPOs = {};
 async function loadOrders() {
   const el = document.getElementById('orders-list');
   el.innerHTML = '';
-  const pos = await api('/api/pos');
+  const [pos, deliveries] = await Promise.all([api('/api/pos'), api('/api/deliveries')]);
   if (!pos.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">No purchase orders yet.<br>Add one above to get started.</div></div>'; return; }
+
   el.innerHTML = pos.map(po => {
     const projTag = po.project ? `<span class="badge badge-blue" style="font-size:11px">${esc(po.project)}</span> ` : '';
     const expanded = expandedPOs[po.id];
+    const total = po.lines.length;
+
+    // Calculate received from deliveries
+    const poDels = deliveries.filter(d => d.po_id === po.id);
+    let received = 0, missing = 0;
+    poDels.forEach(d => (d.lines||[]).forEach(l => {
+      if (l.status === 'ok') received++;
+      else if (l.status === 'missing') missing++;
+    }));
+    const outstanding = total - received;
+    const pct = total > 0 ? Math.round(received / total * 100) : 0;
+    const hasDels = poDels.length > 0;
+
+    const progressBar = hasDels ? `
+      <div style="margin-top:6px">
+        <div style="height:5px;background:#eee;border-radius:4px;overflow:hidden;width:100%">
+          <div style="height:100%;background:${pct===100?'#3B6D11':missing?'#BA7517':'#0F2D52'};border-radius:4px;width:${pct}%"></div>
+        </div>
+        <div style="font-size:11px;color:#888;margin-top:3px">${received}/${total} lines received · ${outstanding} outstanding${missing ? ` · <span style="color:#791F1F">${missing} missing</span>` : ''}</div>
+      </div>` : '';
+
     const lineRows = expanded ? `
       <div style="border-top:1px solid #f0f0f0;margin-top:8px;padding-top:8px">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#888;margin-bottom:6px">Line items</div>
@@ -403,11 +425,13 @@ async function loadOrders() {
             <div style="font-weight:700;flex-shrink:0;margin-left:12px">Qty: ${l.quantity}${l.unit ? ' ' + esc(l.unit) : ''}</div>
           </div>`).join('')}
       </div>` : '';
+
     return `<div class="list-card">
       <div class="list-card-header" onclick="togglePO('${po.id}')" style="cursor:pointer">
         <div style="flex:1;min-width:0">
           <div class="list-card-title">${esc(po.number)} — ${esc(po.supplier)}</div>
-          <div class="list-card-sub">${projTag}${po.lines.length} line${po.lines.length !== 1 ? 's' : ''} · Expected: ${po.expected_date || '—'}</div>
+          <div class="list-card-sub">${projTag}${total} line${total !== 1 ? 's' : ''} · Expected: ${po.expected_date || '—'}</div>
+          ${progressBar}
         </div>
         <div class="list-card-actions" onclick="event.stopPropagation()">
           <span class="badge ${po.status === 'complete' ? 'badge-ok' : 'badge-pending'}">${po.status === 'complete' ? 'Complete' : 'Open'}</span>
