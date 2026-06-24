@@ -138,12 +138,10 @@
               <span class="upload-opt-sub">PDF, JPG or PNG</span>
             </button>
           </div>
-          <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none" onchange="fileSelected(event)">
-          <input type="file" id="file-input" accept=".pdf,.png,.jpg,.jpeg,.txt" style="display:none" onchange="fileSelected(event)">
-          <div id="file-preview" style="display:none" class="file-preview">
-            <span id="file-preview-name"></span>
-            <button class="btn-clear" onclick="clearFile()">✕</button>
-          </div>
+          <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none" onchange="addFile(event)">
+          <input type="file" id="file-input" accept=".pdf,.png,.jpg,.jpeg,.txt" style="display:none" onchange="addFile(event)">
+          <div id="file-list" style="margin-top:8px"></div>
+          <button id="add-another-btn" style="display:none;margin-top:8px;font-size:12px;color:#0F2D52;background:none;border:none;cursor:pointer;text-decoration:underline" onclick="document.getElementById('file-input').click()">+ Add another page</button>
         </div>
 
         <div class="divider-text">or paste text</div>
@@ -247,7 +245,7 @@
         <div class="form-group" style="margin-top:.75rem;position:relative">
           <label>Project / job name</label>
           <input type="text" id="po-project-input" class="input" placeholder="e.g. JLR Ship to Paint" autocomplete="off"
-            oninput="filterProjects(this.value)" onfocus="showProjectDropdown()" onblur="setTimeout(hideProjectDropdown,200)">
+            oninput="filterProjects(this.value)" onfocus="showProjectDropdown()">
           <div id="project-dropdown" style="display:none;position:absolute;left:0;right:0;top:100%;background:#fff;border:1.5px solid #0F2D52;border-top:none;border-radius:0 0 8px 8px;z-index:50;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>
         </div>
         <div id="po-processing" style="display:none" class="processing-card sm">
