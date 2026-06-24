@@ -5,7 +5,6 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const fetch = require('node-fetch');
-let sharp; try { sharp = require('sharp'); } catch(e) { sharp = null; }
 const db = require('./db/database');
 
 const app = express();
@@ -39,22 +38,6 @@ function requireAuth(req, res, next) {
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
-
-
-// Compress image before sending to API
-async function compressImage(filePath, mime) {
-  if (!sharp || mime === 'application/pdf') return null;
-  try {
-    const compressed = await sharp(filePath)
-      .resize({ width: 1600, withoutEnlargement: true })
-      .jpeg({ quality: 75 })
-      .toBuffer();
-    return compressed.toString('base64');
-  } catch(e) {
-    console.log('Compression failed, using original:', e.message);
-    return null;
-  }
 }
 
 // ─── AUTH ───────────────────────────────────────────────
@@ -209,28 +192,22 @@ Rules: match part number first then description; ok=received>=ordered; short=0<r
     const files = req.files || [];
 
     if (files.length > 0) {
-      const fileBlocks = await Promise.all(files.map(async f => {
+      const fileBlocks = files.map(f => {
+        const fileData = fs.readFileSync(f.path);
+        const b64 = fileData.toString('base64');
         const mime = f.mimetype;
-        let b64;
-        const compressed = await compressImage(f.path, mime);
-        if (compressed) {
-          b64 = compressed;
-        } else {
-          b64 = fs.readFileSync(f.path).toString('base64');
-        }
         const type = mime === 'application/pdf' ? 'document' : 'image';
         const src = mime === 'application/pdf'
           ? { type: 'base64', media_type: 'application/pdf', data: b64 }
           : { type: 'base64', media_type: mime, data: b64 };
         return { type, source: src };
-      }));
+      });
       imagePath = files.map(f => f.filename).join(',');
       userContent = [
         ...fileBlocks,
         { type: 'text', text: `Open purchase orders:\n${poIndex}\n\nThe above ${files.length > 1 ? files.length + ' images/pages are all part of the same delivery note' : 'document is a delivery note'}. Identify which PO it belongs to and match all items.` }
       ];
       files.forEach(f => { try { fs.unlinkSync(f.path); } catch(e) {} });
-      // fileBlocks Promise.all already resolved
     } else {
       const text = req.body.text || '';
       if (!text) return res.status(400).json({ error: 'No file or text provided' });
