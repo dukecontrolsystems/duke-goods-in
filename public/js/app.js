@@ -433,7 +433,7 @@ async function loadOrders() {
           const partial = recvd > 0 && recvd < ordered;
           const none = recvd === 0;
           const statusColor = done ? '#27500A' : partial ? '#BA7517' : '#888';
-          const statusLabel = done ? 'Received' : partial ? 'Partial' : poDels.length ? 'Missing' : '—';
+          const statusLabel = done ? '✓ Received' : partial ? '~ Partial' : poDels.length ? '✗ Missing' : '—';
           const rowBg = done ? '#f9fdf5' : partial ? '#fffbf5' : poDels.length ? '#fff8f8' : '';
           return `<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:4px;align-items:center;padding:7px 4px;border-bottom:1px solid #f5f5f5;font-size:13px;background:${rowBg}">
             <div>
@@ -640,7 +640,7 @@ async function loadHistory() {
       const missing = l.status === 'missing';
       const rowBg = done ? '#f9fdf5' : partial ? '#fffbf5' : missing ? '#fff8f8' : '';
       const statusColor = done ? '#27500A' : partial ? '#BA7517' : missing ? '#791F1F' : '#888';
-      const statusLabel = done ? 'Received' : partial ? 'Partial' : missing ? 'Missing' : l.status;
+      const statusLabel = done ? '✓ Received' : partial ? '~ Partial' : missing ? '✗ Missing' : l.status;
       return `<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:4px;align-items:center;padding:7px 4px;border-bottom:1px solid #f5f5f5;font-size:13px;background:${rowBg}">
         <div>
           <div style="font-weight:500">${esc(l.description)}</div>
