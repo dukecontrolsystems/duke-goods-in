@@ -323,12 +323,21 @@ async function loadProjects() {
     let totalLines = 0, receivedLines = 0, shortLines = 0, missingLines = 0;
     proj.pos.forEach(po => {
       totalLines += po.lines.length;
-      po.deliveries.forEach(d => {
-        (d.lines || []).forEach(l => {
-          if (l.status === 'ok') receivedLines++;
-          else if (l.status === 'short') shortLines++;
-          else if (l.status === 'missing') missingLines++;
-        });
+      const hasDels = po.deliveries.length > 0;
+      // Build cumulative received map per line
+      const lineRecvMap = {};
+      po.deliveries.forEach(d => (d.lines||[]).forEach(l => {
+        const key = l.po_line_id || l.description;
+        if (!lineRecvMap[key]) lineRecvMap[key] = 0;
+        lineRecvMap[key] += (l.received || 0);
+      }));
+      // Count against PO lines
+      po.lines.forEach(pol => {
+        const key = pol.id || pol.description;
+        const recvd = lineRecvMap[key] || lineRecvMap[pol.description] || 0;
+        if (recvd >= pol.quantity) receivedLines++;
+        else if (hasDels && recvd > 0) shortLines++;
+        else if (hasDels && recvd === 0) missingLines++;
       });
     });
     const outstanding = totalLines - receivedLines;
@@ -341,8 +350,22 @@ async function loadProjects() {
     const suppliers = [...new Set(proj.pos.map(p => p.supplier))].join(', ');
 
     const poRows = proj.pos.map(po => {
-      let poRec = 0, poTotal = po.lines.length, poMiss = 0;
-      po.deliveries.forEach(d => (d.lines || []).forEach(l => { if (l.status === 'ok') poRec++; else if (l.status === 'missing') poMiss++; }));
+      const poTotal = po.lines.length;
+      const poHasDels = po.deliveries.length > 0;
+      const poRecvMap = {};
+      po.deliveries.forEach(d => (d.lines||[]).forEach(l => {
+        const key = l.po_line_id || l.description;
+        if (!poRecvMap[key]) poRecvMap[key] = 0;
+        poRecvMap[key] += (l.received || 0);
+      }));
+      let poRec = 0, poMiss = 0, poPartial = 0;
+      po.lines.forEach(pol => {
+        const key = pol.id || pol.description;
+        const recvd = poRecvMap[key] || poRecvMap[pol.description] || 0;
+        if (recvd >= pol.quantity) poRec++;
+        else if (poHasDels && recvd === 0) poMiss++;
+        else if (poHasDels && recvd > 0) poPartial++;
+      });
       const poPct = poTotal > 0 ? Math.round(poRec / poTotal * 100) : 0;
       return `<div class="proj-po-row">
         <div>
@@ -352,7 +375,7 @@ async function loadProjects() {
         </div>
         <div class="proj-po-right">
           <div class="proj-po-count">${poRec}/${poTotal}</div>
-          <div class="proj-po-out">${poTotal - poRec} outstanding${poMiss ? ` · <span style="color:var(--red)">${poMiss} missing</span>` : ''}</div>
+          <div class="proj-po-out">${poTotal - poRec} outstanding${poMiss ? ` · <span style="color:var(--red)">${poMiss} missing</span>` : ''}${poPartial ? ` · <span style="color:#BA7517">${poPartial} partial</span>` : ''}</div>
         </div>
       </div>`;
     }).join('');
