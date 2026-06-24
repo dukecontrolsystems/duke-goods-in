@@ -645,7 +645,6 @@ async function loadHistory() {
   const deliveries = await api('/api/deliveries');
   if (!deliveries.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">🕓</div><div class="empty-text">No confirmed deliveries yet.</div></div>'; return; }
   el.innerHTML = deliveries.map(d => {
-    const issues = (d.lines || []).filter(l => l.status !== 'ok').length;
     const projTag = d.project ? `<span class="badge badge-blue" style="font-size:11px;margin-right:4px">${esc(d.project)}</span>` : '';
     const lineRows = (d.lines || []).map(l => {
       const done = l.status === 'ok';
@@ -672,7 +671,6 @@ async function loadHistory() {
           <div class="list-card-sub">Received by: ${esc(d.received_by || '—')}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-          <span class="badge ${issues ? 'badge-missing' : 'badge-ok'}">${issues ? issues + ' issue' + (issues > 1 ? 's' : '') : 'All OK'}</span>
           <button class="btn btn-ghost btn-sm" onclick="deleteDelivery('${d.id}')" style="color:#E24B4A;padding:4px 8px">🗑</button>
         </div>
       </div>
