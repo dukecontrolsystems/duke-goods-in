@@ -636,12 +636,7 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
     }
 
     // Footer — save/restore prevents it joining the content flow
-    doc.save();
-    doc.fontSize(7.5).fillColor('#999').font('Helvetica')
-      .text('www.dukecontrolsystems.com  |  Confidential - Property of Duke Control Systems', left, 758, { width: contentW, lineBreak: false });
-    doc.fontSize(7.5)
-      .text('Content is property of Duke Control Systems. Paper copies are uncontrolled.', left, 768, { width: contentW, lineBreak: false });
-    doc.restore();
+    // Footer temporarily removed to test blank-page issue
 
     doc.end();
     await new Promise(resolve => doc.on('end', resolve));
