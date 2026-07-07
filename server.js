@@ -417,9 +417,8 @@ app.post('/api/extract-quote', requireAuth, upload.array('file', 10), async (req
   "deliveryAddress": "delivery address shown on the quote if any (may say 'deliver to' or 'ship to')",
   "quoteRef": "quote or reference number",
   "date": "quote date",
-  "total": "total price inc VAT if shown",
-  "totalExVat": "total ex VAT if shown",
-  "vatAmount": "VAT amount if shown",
+  "total": "the total order value exactly as shown on the document, whichever figure is actually present",
+  "vatStatus": "'inc' if that total includes VAT, 'exc' if it excludes VAT, 'unknown' if not stated",
   "lines": [
     {
       "description": "item description",
