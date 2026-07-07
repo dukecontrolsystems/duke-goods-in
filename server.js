@@ -492,21 +492,6 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
     const chunks = [];
     doc.on('data', chunk => chunks.push(chunk));
 
-    // Footer on every page — guard against re-entry
-    let addingFooter = false;
-    const addFooter = () => {
-      if (addingFooter) return;
-      addingFooter = true;
-      doc.save();
-      doc.fontSize(7.5).fillColor('#999').font('Helvetica')
-        .text('www.dukecontrolsystems.com  |  Confidential - Property of Duke Control Systems', left, 758, { width: contentW - 60, align: 'left', lineBreak: false });
-      doc.fontSize(7.5).fillColor('#999')
-        .text('Content is property of Duke Control Systems. Paper copies are uncontrolled.', left, 768, { width: contentW - 60, align: 'left', lineBreak: false });
-      doc.restore();
-      addingFooter = false;
-    };
-    doc.on('pageAdded', addFooter);
-
     const pageW = 595, left = 50, right = 545, contentW = 495;
 
     // ── HEADER ──
@@ -587,27 +572,34 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
     doc.moveDown(0.3);
 
     if (lines && lines.length > 0 && poType !== 'subcontractor') {
-      const lh = 18, lTop = doc.y;
+      const lh = 18;
       const cols = [left, left+175, left+265, left+310, left+380, right];
       const headers = ['Description', 'Part No.', 'Qty', 'Unit Price', 'Total'];
+      
+      // Header row
+      const lTop = doc.y;
       doc.rect(left, lTop, contentW, lh).fillColor('#0F2D52').fill();
       headers.forEach((h, i) => {
         doc.fontSize(8).fillColor('#ffffff').font('Helvetica-Bold')
-          .text(h, cols[i] + 3, lTop + 5, { width: cols[i+1] - cols[i] - 6 });
+          .text(h, cols[i] + 3, lTop + 5, { width: cols[i+1] - cols[i] - 6, lineBreak: false });
       });
+      doc.y = lTop + lh;
+
+      // Data rows — use doc.y to allow page breaks
       lines.forEach((l, i) => {
-        const y = lTop + lh + i * lh;
-        doc.rect(left, y, contentW, lh).fillColor(i % 2 === 0 ? '#f7f7f7' : '#fff').fill();
-        doc.rect(left, y, contentW, lh).strokeColor('#ddd').lineWidth(0.3).stroke();
+        const rowY = doc.y;
+        doc.rect(left, rowY, contentW, lh).fillColor(i % 2 === 0 ? '#f7f7f7' : '#fff').fill();
+        doc.rect(left, rowY, contentW, lh).strokeColor('#ddd').lineWidth(0.3).stroke();
         const vals = [l.description||'', l.partNumber||'', String(l.quantity||''),
           l.unitPrice ? `\u00a3${Number(l.unitPrice).toFixed(2)}` : '',
           l.total ? `\u00a3${Number(l.total).toFixed(2)}` : ''];
         vals.forEach((v, j) => {
           doc.fontSize(8).fillColor('#333').font('Helvetica')
-            .text(v, cols[j] + 3, y + 5, { width: cols[j+1] - cols[j] - 6 });
+            .text(v, cols[j] + 3, rowY + 5, { width: cols[j+1] - cols[j] - 6, lineBreak: false });
         });
+        doc.y = rowY + lh;
       });
-      doc.y = lTop + lh + lines.length * lh + 8;
+      doc.moveDown(0.5);
     }
 
     // Scope text — auto-generate if blank
@@ -630,8 +622,11 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
         .text('This purchase order is raised in accordance with dukes subcontractor Confidentiality & Customer Protection Agreement.');
     }
 
-    // Add footer to first/last page
-    addFooter();
+    // Footer on current (last) page only at fixed position
+    doc.fontSize(7.5).fillColor('#999').font('Helvetica')
+      .text('www.dukecontrolsystems.com  |  Confidential - Property of Duke Control Systems', left, 758, { width: contentW, align: 'left', lineBreak: false });
+    doc.fontSize(7.5).fillColor('#999')
+      .text('Content is property of Duke Control Systems. Paper copies are uncontrolled.', left, 768, { width: contentW, align: 'left', lineBreak: false });
 
     doc.end();
     await new Promise(resolve => doc.on('end', resolve));
