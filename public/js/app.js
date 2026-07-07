@@ -1125,10 +1125,18 @@ function confirmDeliveryAddress(checked) {
 }
 
 function showRaiseProjectDropdown() {
-  const dd = document.getElementById('raise-project-dropdown');
-  if (dd && allProjectNames.length) {
-    renderRaiseProjectDropdown(allProjectNames);
+  if (!allProjectNames.length) {
+    loadProjectSuggestions().then(() => renderRaiseProjectDropdown(allProjectNames));
+    return;
   }
+  renderRaiseProjectDropdown(allProjectNames);
+}
+
+function filterRaiseProjects(val) {
+  const filtered = val
+    ? allProjectNames.filter(n => n.toLowerCase().includes(val.toLowerCase()))
+    : allProjectNames;
+  renderRaiseProjectDropdown(filtered);
 }
 
 function renderRaiseProjectDropdown(names) {
@@ -1243,9 +1251,9 @@ async function loadRaisedPOs() {
         <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleRaisedPO('${p.id}')">
           <div>
             <div style="font-weight:600;font-size:14px">${esc(p.po_number)}</div>
-            <div style="font-size:12px;color:#888;margin-top:2px" id="raised-project-line-${p.id}">
+            <div style="font-size:12px;color:#888;margin-top:2px" id="raised-project-line-${p.id}" onclick="event.stopPropagation()">
               ${esc(p.supplier || '')} · <span id="raised-project-text-${p.id}">${esc(p.project || '—')}</span>
-              <span onclick="event.stopPropagation(); editRaisedProject('${p.id}')" style="cursor:pointer" title="Change project">✏️</span>
+              <span onclick="editRaisedProject('${p.id}')" style="cursor:pointer" title="Change project">✏️</span>
               · ${p.issue_date || '—'}
             </div>
           </div>
