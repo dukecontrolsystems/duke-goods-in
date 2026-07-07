@@ -1092,9 +1092,21 @@ function renderRaiseProjectDropdown(names) {
   dd.style.display = 'block';
 }
 
+let issuedPOsExpanded = false;
+
+function toggleIssuedPOs() {
+  issuedPOsExpanded = !issuedPOsExpanded;
+  const el = document.getElementById('issued-pos-list');
+  const chevron = document.getElementById('issued-pos-chevron');
+  el.style.display = issuedPOsExpanded ? 'block' : 'none';
+  chevron.style.transform = issuedPOsExpanded ? 'rotate(180deg)' : '';
+}
+
 async function loadIssuedPOs() {
   try {
     const pos = await api('/api/issued-pos');
+    const countEl = document.getElementById('issued-pos-count');
+    if (countEl) countEl.textContent = pos.length ? `(${pos.length})` : '';
     const el = document.getElementById('issued-pos-list');
     if (!pos.length) { el.innerHTML = '<div style="color:#aaa;font-size:13px">None yet</div>'; return; }
     el.innerHTML = pos.map(p => `
