@@ -430,7 +430,7 @@ app.post('/api/extract-quote', requireAuth, upload.array('file', 10), async (req
     }
   ],
   "deliveryCharge": 0.00,
-  "notes": "brief scope description only - do NOT include supplier payment terms, incoterms, VAT info or legal boilerplate"
+  "notes": "write ONLY a brief one-sentence scope e.g. 'Supply of cable products as per quotation PI-106671.' Do NOT copy supplier payment terms, incoterms, VAT rates, delivery conditions, legal text or any boilerplate."
 }` }
       ];
     } else {
@@ -488,9 +488,20 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
             quoteRef, total, contractPerson, scope, lines, issueDate,
             contractorName, startDate, endDate, totalHours, hourlyRate, location } = req.body;
 
-    const doc = new PDFDocument({ size: 'A4', margins: { top: 40, bottom: 40, left: 50, right: 50 }, bufferPages: true, autoFirstPage: true });
+    const doc = new PDFDocument({ size: 'A4', margins: { top: 40, bottom: 80, left: 50, right: 50 } });
     const chunks = [];
     doc.on('data', chunk => chunks.push(chunk));
+
+    // Footer on every page
+    const addFooter = () => {
+      doc.save();
+      doc.fontSize(7.5).fillColor('#999').font('Helvetica')
+        .text('www.dukecontrolsystems.com  |  Confidential - Property of Duke Control Systems', left, 758, { width: contentW - 60, align: 'left', lineBreak: false });
+      doc.fontSize(7.5).fillColor('#999')
+        .text('Content is property of Duke Control Systems. Paper copies are uncontrolled.', left, 768, { width: contentW - 60, align: 'left', lineBreak: false });
+      doc.restore();
+    };
+    doc.on('pageAdded', addFooter);
 
     const pageW = 595, left = 50, right = 545, contentW = 495;
 
@@ -595,10 +606,12 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
       doc.y = lTop + lh + lines.length * lh + 8;
     }
 
-    // Scope text — only use our own scope, not supplier terms
-    const scopeText = scope || (poType === 'subcontractor'
-      ? `Providing ${contractorName || 'contractor'} services as described above.`
-      : `Supply of Parts as per quotation ${quoteRef || ''}.`);
+    // Scope text — auto-generate if blank
+    let scopeText = scope && scope.trim().length > 10
+      ? scope.trim()
+      : (poType === 'subcontractor'
+          ? `Providing ${contractorName || 'contractor'} services as described above.`
+          : `Supply of Parts as per quotation ${quoteRef || ''}.`);
     doc.fontSize(9).fillColor('#333').font('Helvetica').text(scopeText, left, doc.y, { width: contentW });
 
     // ── CONFIDENTIALITY BOX (subcontractor only) ──
@@ -613,21 +626,11 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
         .text('This purchase order is raised in accordance with dukes subcontractor Confidentiality & Customer Protection Agreement.');
     }
 
-    // ── FOOTER ── written after buffering so it always goes on page 1
+    // Add footer to first/last page
+    addFooter();
+
     doc.end();
     await new Promise(resolve => doc.on('end', resolve));
-
-    // Write footer on first page only using buffered pages
-    const range = doc.bufferedPageRange();
-    doc.switchToPage(0);
-    doc.fontSize(7.5).fillColor('#999').font('Helvetica')
-      .text('www.dukecontrolsystems.com  |  Confidential - Property of Duke Control Systems', left, 778, { width: contentW - 60, align: 'left', lineBreak: false });
-    doc.fontSize(7.5).fillColor('#999').font('Helvetica')
-      .text('Content is property of Duke Control Systems. Paper copies are uncontrolled.', left, 788, { width: contentW - 60, align: 'left', lineBreak: false });
-    doc.fontSize(7.5).fillColor('#999').font('Helvetica')
-      .text('Page 1 of 1', left, 783, { width: contentW, align: 'right', lineBreak: false });
-
-    doc.flushPages();
     const pdfBuffer = Buffer.concat(chunks);
 
     // Save to issued_pos
