@@ -1205,8 +1205,12 @@ async function loadRaisedPOs() {
   const el = document.getElementById('raised-pos-list');
   if (!el) return;
   try {
-    const pos = await api('/api/issued-pos');
-    if (!pos.length) { el.innerHTML = '<div style="color:#aaa;font-size:13px">No purchase orders raised yet</div>'; return; }
+    const [pos, projectNames] = await Promise.all([
+      api('/api/issued-pos'),
+      api('/api/project-names').catch(() => [])
+    ]);
+    const datalist = `<datalist id="raised-project-datalist">${projectNames.map(n => `<option value="${esc(n)}">`).join('')}</datalist>`;
+    if (!pos.length) { el.innerHTML = datalist + '<div style="color:#aaa;font-size:13px">No purchase orders raised yet</div>'; return; }
 
     el.innerHTML = pos.map(p => {
       const expanded = !!expandedRaisedPOs[p.id];
@@ -1239,8 +1243,10 @@ async function loadRaisedPOs() {
         <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleRaisedPO('${p.id}')">
           <div>
             <div style="font-weight:600;font-size:14px">${esc(p.po_number)}</div>
-            <div style="font-size:12px;color:#888;margin-top:2px">
-              ${esc(p.supplier || '')} · ${esc(p.project || '—')} · ${p.issue_date || '—'}
+            <div style="font-size:12px;color:#888;margin-top:2px" id="raised-project-line-${p.id}">
+              ${esc(p.supplier || '')} · <span id="raised-project-text-${p.id}">${esc(p.project || '—')}</span>
+              <span onclick="event.stopPropagation(); editRaisedProject('${p.id}')" style="cursor:pointer" title="Change project">✏️</span>
+              · ${p.issue_date || '—'}
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px" onclick="event.stopPropagation()">
@@ -1258,7 +1264,30 @@ async function loadRaisedPOs() {
         ${detail}
       </div>`;
     }).join('');
+    el.innerHTML = datalist + el.innerHTML;
   } catch(e) {}
+}
+
+function editRaisedProject(id) {
+  const line = document.getElementById('raised-project-line-' + id);
+  const current = document.getElementById('raised-project-text-' + id).textContent.trim();
+  line.innerHTML = `
+    <input type="text" id="raised-project-input-${id}" class="input" style="font-size:12px;padding:3px 6px;width:170px;display:inline-block" value="${esc(current === '—' ? '' : current)}" list="raised-project-datalist" placeholder="Project name">
+    <span onclick="event.stopPropagation(); saveRaisedProject('${id}')" style="cursor:pointer" title="Save">✔️</span>
+    <span onclick="event.stopPropagation(); loadRaisedPOs()" style="cursor:pointer" title="Cancel">✖️</span>
+  `;
+  document.getElementById('raised-project-input-' + id).focus();
+}
+
+async function saveRaisedProject(id) {
+  const input = document.getElementById('raised-project-input-' + id);
+  const project = input.value.trim();
+  if (!project) { toast('Project name is required'); return; }
+  try {
+    await api('/api/issued-pos/' + id + '/project', 'PUT', { project });
+    toast('Project updated');
+    loadRaisedPOs();
+  } catch(e) { toast('Error: ' + e.message); }
 }
 
 async function attachRaisedPdf(id, input) {
