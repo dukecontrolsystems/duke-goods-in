@@ -702,6 +702,18 @@ app.delete('/api/issued-pos/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// Reassign the project on an issued PO — also updates purchase_orders so Orders/Projects tabs match
+app.put('/api/issued-pos/:id/project', requireAuth, (req, res) => {
+  const { project } = req.body;
+  if (!project || !project.trim()) return res.status(400).json({ error: 'Project name is required' });
+  const po = db.prepare('SELECT po_number FROM issued_pos WHERE id=?').get(req.params.id);
+  if (!po) return res.status(404).json({ error: 'PO not found' });
+  const trimmed = project.trim();
+  db.prepare('UPDATE issued_pos SET project=? WHERE id=?').run(trimmed, req.params.id);
+  db.prepare('UPDATE purchase_orders SET project=? WHERE number=?').run(trimmed, po.po_number);
+  res.json({ ok: true });
+});
+
 // Attach/replace the stored PDF for an issued PO (e.g. backfilling ones raised before PDF storage existed)
 app.post('/api/issued-pos/:id/attach-pdf', requireAuth, uploadMemory.single('file'), (req, res) => {
   const po = db.prepare('SELECT po_number FROM issued_pos WHERE id=?').get(req.params.id);
