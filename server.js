@@ -619,7 +619,7 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
 
     // Write footer on first page only using buffered pages
     const range = doc.bufferedPageRange();
-    doc.switchToPage(range.start);
+    doc.switchToPage(0);
     doc.fontSize(7.5).fillColor('#999').font('Helvetica')
       .text('www.dukecontrolsystems.com  |  Confidential - Property of Duke Control Systems', left, 778, { width: contentW - 60, align: 'left', lineBreak: false });
     doc.fontSize(7.5).fillColor('#999').font('Helvetica')
