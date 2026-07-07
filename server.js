@@ -481,22 +481,11 @@ function formatDate(dateStr) {
 }
 
 // Generate PO PDF and save to tracking
-function fitText(doc, text, maxWidth, fontSize) {
-  doc.fontSize(fontSize).font('Helvetica');
-  const str = String(text || '');
-  if (doc.widthOfString(str) <= maxWidth) return str;
-  let t = str;
-  while (t.length > 0 && doc.widthOfString(t + '\u2026') > maxWidth) {
-    t = t.slice(0, -1);
-  }
-  return t + '\u2026';
-}
-
 app.post('/api/raise-po', requireAuth, async (req, res) => {
   try {
     const PDFDocument = require('pdfkit');
     const { poType, poNumber, supplier, supplierAddress, project, deliveryAddress,
-            quoteRef, total, contractPerson, scope, lines, issueDate,
+            quoteRef, total, vatStatus, contractPerson, scope, lines, issueDate,
             contractorName, startDate, endDate, totalHours, hourlyRate, location } = req.body;
 
     const doc = new PDFDocument({ size: 'A4', margins: { top: 40, bottom: 80, left: 50, right: 50 } });
@@ -557,25 +546,35 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
           ['Project Reference:', project || ''],
           ['Delivery Address:', deliveryAddress || ''],
           ['Quote Reference:', quoteRef || ''],
-          ['Order Total (Inc VAT):', total ? (total.startsWith('£') ? total : `£${total}`) : ''],
+          [
+            vatStatus === 'inc' ? 'Order Total (Inc VAT):'
+              : vatStatus === 'exc' ? 'Order Total (Excl VAT):'
+              : 'Order Total:',
+            total ? (total.startsWith('£') ? total : `£${total}`) : ''
+          ],
           ['Contract Person:', contractPerson || ''],
         ];
 
+    const val2W = contentW - col1W - 6;
+    let rowCursorY = tableTop;
     rows.forEach((row, i) => {
-      const y = tableTop + i * rowH;
+      const y = rowCursorY;
       const val = row[1] || '\u2014';
-      const lineCount = val.split('\n').length;
-      const rH = Math.max(rowH, lineCount * 14 + 8);
+      doc.fontSize(9).font('Helvetica');
+      const textH = doc.heightOfString(val, { width: val2W });
+      const rH = Math.max(rowH, textH + 14);
 
       doc.rect(left, y, contentW, rH).fillColor(i % 2 === 0 ? '#f7f7f7' : '#ffffff').fill();
       doc.rect(left, y, contentW, rH).strokeColor('#dddddd').lineWidth(0.4).stroke();
       doc.fontSize(9).fillColor('#0F2D52').font('Helvetica-Bold')
         .text(row[0], left + 6, y + 7, { width: col1W - 6 });
       doc.fontSize(9).fillColor('#333').font('Helvetica')
-        .text(val, left + col1W, y + 7, { width: contentW - col1W - 6 });
+        .text(val, left + col1W, y + 7, { width: val2W });
+
+      rowCursorY = y + rH;
     });
 
-    const afterTable = tableTop + rows.length * rowH + 14;
+    const afterTable = rowCursorY + 14;
     doc.y = afterTable;
 
     // ── SCOPE ──
@@ -596,21 +595,30 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
       });
       doc.y = lTop + lh;
 
-      // Data rows — use doc.y to allow page breaks
+      // Data rows — height grows to fit wrapped text, doc.y advances to match
       lines.forEach((l, i) => {
         const rowY = doc.y;
-        doc.rect(left, rowY, contentW, lh).fillColor(i % 2 === 0 ? '#f7f7f7' : '#fff').fill();
-        doc.rect(left, rowY, contentW, lh).strokeColor('#ddd').lineWidth(0.3).stroke();
         const vals = [l.description||'', l.partNumber||'', String(l.quantity||''),
           l.unitPrice ? `\u00a3${Number(l.unitPrice).toFixed(2)}` : '',
           l.total ? `\u00a3${Number(l.total).toFixed(2)}` : ''];
+
+        // Work out the tallest cell in this row so the box fits wrapped text
+        doc.fontSize(8).font('Helvetica');
+        let maxH = lh;
         vals.forEach((v, j) => {
           const colWidth = cols[j+1] - cols[j] - 6;
-          const fitted = fitText(doc, v, colWidth, 8);
-          doc.fontSize(8).fillColor('#333').font('Helvetica')
-            .text(fitted, cols[j] + 3, rowY + 5, { width: colWidth, lineBreak: false });
+          const h = doc.heightOfString(v, { width: colWidth });
+          if (h + 10 > maxH) maxH = h + 10;
         });
-        doc.y = rowY + lh;
+
+        doc.rect(left, rowY, contentW, maxH).fillColor(i % 2 === 0 ? '#f7f7f7' : '#fff').fill();
+        doc.rect(left, rowY, contentW, maxH).strokeColor('#ddd').lineWidth(0.3).stroke();
+        vals.forEach((v, j) => {
+          const colWidth = cols[j+1] - cols[j] - 6;
+          doc.fontSize(8).fillColor('#333').font('Helvetica')
+            .text(v, cols[j] + 3, rowY + 5, { width: colWidth });
+        });
+        doc.y = rowY + maxH;
       });
       doc.moveDown(0.5);
     }
@@ -634,9 +642,6 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
       doc.fillColor('#333').font('Helvetica')
         .text('This purchase order is raised in accordance with dukes subcontractor Confidentiality & Customer Protection Agreement.');
     }
-
-    // Footer — save/restore prevents it joining the content flow
-    // Footer temporarily removed to test blank-page issue
 
     doc.end();
     await new Promise(resolve => doc.on('end', resolve));
