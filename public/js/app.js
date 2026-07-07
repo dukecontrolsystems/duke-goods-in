@@ -886,12 +886,30 @@ let raiseLines = [];
 
 function selectPOType(type) {
   raisePOType = type;
-  // Highlight selected
   document.getElementById('raise-type-supplier').style.border = type === 'supplier' ? '2px solid #0F2D52' : '';
   document.getElementById('raise-type-sub').style.border = type === 'subcontractor' ? '2px solid #0F2D52' : '';
-  // Show/hide fields based on type
   document.getElementById('raise-step1').style.display = 'none';
-  document.getElementById('raise-step2').style.display = 'block';
+
+  if (type === 'subcontractor') {
+    // Skip quote upload — go straight to form
+    document.getElementById('raise-step3').style.display = 'block';
+    document.getElementById('raise-processing').style.display = 'none';
+    document.getElementById('raise-step2').style.display = 'none';
+    document.getElementById('raise-supplier-only-fields').style.display = 'none';
+    document.getElementById('raise-subcon-only-fields').style.display = 'block';
+    document.getElementById('raise-lines-section').style.display = 'none';
+    document.getElementById('raise-supplier-address-group').style.display = 'block';
+    document.getElementById('raise-address-label').textContent = 'Company Address';
+    document.getElementById('raise-issue-date').value = new Date().toISOString().slice(0,10);
+    // Auto-generate PO number
+    api('/api/next-po-number?supplierCode=SUB').then(r => {
+      document.getElementById('raise-po-number').value = r.number;
+    }).catch(() => {});
+    loadProjectSuggestions();
+    document.getElementById('raise-form').style.display = 'block';
+  } else {
+    document.getElementById('raise-step2').style.display = 'block';
+  }
 }
 
 function raiseBack() {
@@ -900,8 +918,12 @@ function raiseBack() {
 }
 
 function raiseBack2() {
-  document.getElementById('raise-step2').style.display = 'block';
   document.getElementById('raise-step3').style.display = 'none';
+  if (raisePOType === 'subcontractor') {
+    document.getElementById('raise-step1').style.display = 'block';
+  } else {
+    document.getElementById('raise-step2').style.display = 'block';
+  }
 }
 
 function raiseFileSelected(e) {
