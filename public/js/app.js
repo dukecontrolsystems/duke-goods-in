@@ -66,6 +66,7 @@ function goTab(name) {
   if (name === 'history') loadHistory();
   if (name === 'unmatched') loadUnmatched();
   if (name === 'home') loadHome();
+  if (name === 'raise') { loadIssuedPOs(); loadProjectSuggestions(); }
 }
 
 function loadHome() {
@@ -872,6 +873,211 @@ function exportCSV() {
     a.download = 'duke-goods-in.csv';
     a.click();
   });
+}
+
+
+// ══════════════════════════════════════════════
+// RAISE PO
+// ══════════════════════════════════════════════
+
+let raisePOType = 'supplier';
+let raiseSelectedFile = null;
+let raiseLines = [];
+
+function selectPOType(type) {
+  raisePOType = type;
+  // Highlight selected
+  document.getElementById('raise-type-supplier').style.border = type === 'supplier' ? '2px solid #0F2D52' : '';
+  document.getElementById('raise-type-sub').style.border = type === 'subcontractor' ? '2px solid #0F2D52' : '';
+  // Show/hide fields based on type
+  document.getElementById('raise-step1').style.display = 'none';
+  document.getElementById('raise-step2').style.display = 'block';
+}
+
+function raiseBack() {
+  document.getElementById('raise-step1').style.display = 'block';
+  document.getElementById('raise-step2').style.display = 'none';
+}
+
+function raiseBack2() {
+  document.getElementById('raise-step2').style.display = 'block';
+  document.getElementById('raise-step3').style.display = 'none';
+}
+
+function raiseFileSelected(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  raiseSelectedFile = file;
+  document.getElementById('raise-file-preview').style.display = 'flex';
+  document.getElementById('raise-file-name').textContent = '✓ ' + file.name;
+}
+
+function raiseClearFile() {
+  raiseSelectedFile = null;
+  document.getElementById('raise-file-preview').style.display = 'none';
+  document.getElementById('raise-camera').value = '';
+  document.getElementById('raise-file').value = '';
+}
+
+async function extractQuote() {
+  if (!raiseSelectedFile) { toast('Please select a file first'); return; }
+  document.getElementById('raise-step2').style.display = 'none';
+  document.getElementById('raise-step3').style.display = 'block';
+  document.getElementById('raise-processing').style.display = 'block';
+  document.getElementById('raise-form').style.display = 'none';
+
+  try {
+    const fd = new FormData();
+    fd.append('file', raiseSelectedFile);
+    const res = await fetch('/api/extract-quote', { method: 'POST', body: fd });
+    const result = await res.json();
+
+    // Populate form
+    document.getElementById('raise-supplier').value = result.supplier || '';
+    document.getElementById('raise-supplier-address').value = result.supplierAddress || '';
+    document.getElementById('raise-quote-ref').value = result.quoteRef || '';
+    document.getElementById('raise-total').value = result.total || '';
+    document.getElementById('raise-scope').value = result.notes || '';
+    document.getElementById('raise-issue-date').value = new Date().toISOString().slice(0,10);
+
+    // Auto-generate PO number from supplier
+    const supplierCode = (result.supplier || 'SUP').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0,6);
+    const numRes = await api('/api/next-po-number?supplierCode=' + supplierCode);
+    document.getElementById('raise-po-number').value = numRes.number;
+
+    // Set up line items
+    raiseLines = result.lines || [];
+    renderRaiseLines();
+
+    // Adjust form for type
+    const isSupplier = raisePOType === 'supplier';
+    document.getElementById('raise-supplier-fields').style.display = isSupplier ? 'grid' : 'none';
+    document.getElementById('raise-lines-section').style.display = isSupplier ? 'block' : 'none';
+    document.getElementById('raise-delivery-label').textContent = isSupplier ? 'Delivery Address' : 'Location';
+    document.getElementById('raise-supplier-address-group').style.display = isSupplier ? 'none' : 'block';
+
+    // Load project suggestions
+    await loadProjectSuggestions();
+
+    document.getElementById('raise-processing').style.display = 'none';
+    document.getElementById('raise-form').style.display = 'block';
+  } catch(e) {
+    toast('Error: ' + e.message);
+    document.getElementById('raise-step3').style.display = 'none';
+    document.getElementById('raise-step2').style.display = 'block';
+  }
+}
+
+function renderRaiseLines() {
+  const el = document.getElementById('raise-lines-list');
+  if (!raiseLines.length) { el.innerHTML = '<div style="color:#aaa;font-size:13px;margin-bottom:8px">No lines extracted — add manually</div>'; return; }
+  el.innerHTML = raiseLines.map((l, i) => `
+    <div style="display:grid;grid-template-columns:2fr 1fr 0.7fr 1fr 1fr auto;gap:6px;align-items:center;margin-bottom:6px;font-size:13px">
+      <input class="input" style="font-size:12px;padding:6px" value="${esc(l.description)}" oninput="raiseLines[${i}].description=this.value" placeholder="Description">
+      <input class="input" style="font-size:12px;padding:6px" value="${esc(l.partNumber||'')}" oninput="raiseLines[${i}].partNumber=this.value" placeholder="Part No.">
+      <input class="input" style="font-size:12px;padding:6px" value="${l.quantity||1}" oninput="raiseLines[${i}].quantity=this.value" placeholder="Qty" type="number">
+      <input class="input" style="font-size:12px;padding:6px" value="${l.unitPrice||''}" oninput="raiseLines[${i}].unitPrice=this.value" placeholder="Unit £">
+      <input class="input" style="font-size:12px;padding:6px" value="${l.total||''}" oninput="raiseLines[${i}].total=this.value" placeholder="Total £">
+      <button class="btn-clear" onclick="raiseRemoveLine(${i})">✕</button>
+    </div>`).join('');
+}
+
+function raiseAddLine() {
+  raiseLines.push({ description: '', partNumber: '', quantity: 1, unitPrice: '', total: '' });
+  renderRaiseLines();
+}
+
+function raiseRemoveLine(i) {
+  raiseLines.splice(i, 1);
+  renderRaiseLines();
+}
+
+async function generatePO() {
+  const poNumber = document.getElementById('raise-po-number').value.trim();
+  const supplier = document.getElementById('raise-supplier').value.trim();
+  const project = document.getElementById('raise-project').value.trim();
+  const issueDate = document.getElementById('raise-issue-date').value;
+  if (!poNumber || !supplier) { toast('PO number and supplier are required'); return; }
+  if (!project) { toast('Project reference is required'); document.getElementById('raise-project').focus(); return; }
+
+  const payload = {
+    poType: raisePOType,
+    poNumber,
+    supplier,
+    supplierAddress: document.getElementById('raise-supplier-address').value,
+    project,
+    deliveryAddress: document.getElementById('raise-delivery-address').value,
+    quoteRef: document.getElementById('raise-quote-ref').value,
+    total: document.getElementById('raise-total').value,
+    contractPerson: document.getElementById('raise-contract-person').value,
+    scope: document.getElementById('raise-scope').value,
+    lines: raisePOType === 'supplier' ? raiseLines : [],
+    issueDate
+  };
+
+  try {
+    const res = await fetch('/api/raise-po', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = poNumber + '.pdf';
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('PO generated and added to tracking!');
+    loadIssuedPOs();
+    // Reset form
+    document.getElementById('raise-step3').style.display = 'none';
+    document.getElementById('raise-step1').style.display = 'block';
+    raiseLines = []; raiseSelectedFile = null;
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+function showRaiseProjectDropdown() {
+  const dd = document.getElementById('raise-project-dropdown');
+  if (dd && allProjectNames.length) {
+    renderRaiseProjectDropdown(allProjectNames);
+  }
+}
+
+function renderRaiseProjectDropdown(names) {
+  const dd = document.getElementById('raise-project-dropdown');
+  if (!dd) return;
+  if (!names.length) { dd.style.display = 'none'; return; }
+  dd.innerHTML = names.map(n =>
+    `<div data-name="${esc(n)}" style="padding:10px 14px;font-size:14px;cursor:pointer;border-bottom:0.5px solid #f0f0f0;color:#1a1a1a"
+      onmouseover="this.style.background='#EAF3DE'" onmouseout="this.style.background=''">${esc(n)}</div>`
+  ).join('');
+  dd.onclick = function(e) {
+    const item = e.target.closest('[data-name]');
+    if (item) { document.getElementById('raise-project').value = item.getAttribute('data-name'); dd.style.display = 'none'; }
+  };
+  dd.style.display = 'block';
+}
+
+async function loadIssuedPOs() {
+  try {
+    const pos = await api('/api/issued-pos');
+    const el = document.getElementById('issued-pos-list');
+    if (!pos.length) { el.innerHTML = '<div style="color:#aaa;font-size:13px">None yet</div>'; return; }
+    el.innerHTML = pos.map(p => `
+      <div class="list-card" style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:600;font-size:14px">${esc(p.po_number)}</div>
+            <div style="font-size:12px;color:#888;margin-top:2px">
+              ${p.supplier} · ${p.project || '—'} · ${p.issue_date || '—'}
+            </div>
+          </div>
+          <span class="badge badge-ok" style="font-size:11px">${p.po_type === 'subcontractor' ? 'Sub-Con' : 'Supplier'}</span>
+        </div>
+      </div>`).join('');
+  } catch(e) {}
 }
 
 // ── Helpers ────────────────────────────────────────────
