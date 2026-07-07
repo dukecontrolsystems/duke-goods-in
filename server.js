@@ -19,6 +19,7 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => cb(null, Date.now() + '-' + Math.random().toString(36).slice(2) + '-' + file.originalname.replace(/\s/g, '_'))
 });
 const upload = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 } });
+const uploadMemory = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 // PDFs are stored under UPLOAD_DIR/pdfs (persistent Railway volume), served via /uploads
 const PDF_DIR = path.join(UPLOAD_DIR, 'pdfs');
@@ -698,6 +699,16 @@ app.get('/api/issued-pos', requireAuth, (req, res) => {
 
 app.delete('/api/issued-pos/:id', requireAuth, (req, res) => {
   db.prepare('DELETE FROM issued_pos WHERE id=?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+// Attach/replace the stored PDF for an issued PO (e.g. backfilling ones raised before PDF storage existed)
+app.post('/api/issued-pos/:id/attach-pdf', requireAuth, uploadMemory.single('file'), (req, res) => {
+  const po = db.prepare('SELECT po_number FROM issued_pos WHERE id=?').get(req.params.id);
+  if (!po) return res.status(404).json({ error: 'PO not found' });
+  if (!req.file) return res.status(400).json({ error: 'No file provided' });
+  if (req.file.mimetype !== 'application/pdf') return res.status(400).json({ error: 'File must be a PDF' });
+  fs.writeFileSync(path.join(PDF_DIR, pdfFilenameFor(po.po_number)), req.file.buffer);
   res.json({ ok: true });
 });
 
