@@ -469,161 +469,173 @@ app.get('/api/next-po-number', requireAuth, (req, res) => {
   res.json({ number });
 });
 
+// Helper: format date as "7th July 2026"
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d)) return dateStr;
+  const day = d.getDate();
+  const suffix = ['th','st','nd','rd'][(day % 10 > 3 || Math.floor(day / 10) === 1) ? 0 : day % 10] || 'th';
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return `${day}${suffix} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
 // Generate PO PDF and save to tracking
 app.post('/api/raise-po', requireAuth, async (req, res) => {
   try {
     const PDFDocument = require('pdfkit');
     const { poType, poNumber, supplier, supplierAddress, project, deliveryAddress,
-            quoteRef, total, contractPerson, scope, lines, issueDate } = req.body;
+            quoteRef, total, contractPerson, scope, lines, issueDate,
+            contractorName, startDate, endDate, totalHours, hourlyRate, location } = req.body;
 
-    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+    const doc = new PDFDocument({ size: 'A4', margins: { top: 40, bottom: 60, left: 50, right: 50 } });
     const chunks = [];
     doc.on('data', chunk => chunks.push(chunk));
 
+    const pageW = 595, left = 50, right = 545, contentW = 495;
+
     // ── HEADER ──
-    // Logo placeholder area
     const logoPath = path.join(__dirname, 'public', 'logo.png');
     if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, 50, 40, { width: 160 });
+      doc.image(logoPath, left, 30, { width: 130 });
     }
 
-    // Top right type label
-    const typeLabel = poType === 'subcontractor' ? 'Sub-Contractor\nPurchase Order' : 'Supplier\nPurchase Order';
+    // Top right label
+    const typeLabel = poType === 'subcontractor' ? 'Sub-Contractor' : 'Supplier';
     doc.fontSize(10).fillColor('#E8622A').font('Helvetica-Bold')
-      .text(typeLabel, 350, 45, { width: 195, align: 'right' });
-    doc.fontSize(9).fillColor('#333').font('Helvetica')
-      .text(`${poNumber} | Issue 1.0`, 350, 70, { width: 195, align: 'right' });
+      .text(typeLabel, 350, 32, { width: 195, align: 'right' });
+    doc.fontSize(10).fillColor('#0F2D52').font('Helvetica-Bold')
+      .text('Purchase Order', 350, 46, { width: 195, align: 'right' });
+    doc.fontSize(8).fillColor('#555').font('Helvetica')
+      .text(`${poNumber} | Issue 1.0`, 350, 60, { width: 195, align: 'right' });
 
-    // Orange line under header
-    doc.moveTo(50, 90).lineTo(545, 90).strokeColor('#E8622A').lineWidth(2).stroke();
+    // Orange divider line
+    doc.moveTo(left, 80).lineTo(right, 80).strokeColor('#E8622A').lineWidth(1.5).stroke();
 
     // ── TITLE ──
-    doc.moveDown(2);
-    doc.fontSize(14).fillColor('#0F2D52').font('Helvetica-Bold')
-      .text(`PURCHASE ORDER (PO) – [${poNumber}]`, 50, 110, { align: 'center' });
+    doc.fontSize(13).fillColor('#0F2D52').font('Helvetica-Bold')
+      .text(`PURCHASE ORDER (PO) \u2013 [${poNumber}]`, left, 92, { width: contentW, align: 'center' });
 
-    // Company details
-    doc.moveDown(0.5);
-    doc.fontSize(9).fillColor('#333').font('Helvetica-Oblique')
-      .text('Manageverse Consultancy Limited T/A Duke Control Systems', { align: 'center' })
-      .text('Duke Control Systems is a trading name of Manageverse Consultancy Limited registered in England &', { align: 'center' })
-      .text('Wales 14804396. Registered Office: 2 Fournier House, 8 Tenby Street, Birmingham, B1 3AJ.', { align: 'center' });
-
-    doc.moveDown(1);
+    // Company sub-title
+    doc.fontSize(8).fillColor('#444').font('Helvetica-Oblique')
+      .text('Manageverse Consultancy Limited T/A Duke Control Systems', left, 112, { width: contentW, align: 'center' })
+      .text('Duke Control Systems is a trading name of Manageverse Consultancy Limited registered in England &', { width: contentW, align: 'center' })
+      .text('Wales 14804396. Registered Office: 2 Fournier House, 8 Tenby Street, Birmingham, B1 3AJ.', { width: contentW, align: 'center' });
 
     // ── DETAILS TABLE ──
-    const tableTop = doc.y;
-    const col1 = 50, col2 = 200, tableWidth = 495;
-    const rowH = 28;
-    doc.font('Helvetica');
+    const tableTop = 148;
+    const col1W = 155, rowH = 26;
 
-    const supplierLabel = poType === 'subcontractor' ? 'Contractor:' : 'Supplier:';
     const rows = poType === 'subcontractor'
       ? [
           ['Work Order Number:', poNumber],
-          ['Date of Issue:', issueDate],
-          [supplierLabel, `${supplier}\n${supplierAddress || ''}`],
+          ['Date of Issue:', formatDate(issueDate)],
+          ['Contractor:', `${supplier}${supplierAddress ? '\n' + supplierAddress : ''}`],
+          ['Contractor Personnel:', contractorName || ''],
           ['Project Reference:', project || ''],
-          ['Location:', deliveryAddress || ''],
-          ['Contract Person:', contractPerson || ''],
+          ['Location:', location || ''],
+          ['Start Date:', formatDate(startDate)],
+          ['End Date:', endDate || ''],
+          ['Day Rate / Fee:', hourlyRate ? `£${hourlyRate} GBP p/hr` : ''],
+          ['Total Hours:', totalHours || ''],
         ]
       : [
           ['Work Order Number:', poNumber],
-          ['Date of Issue:', issueDate],
-          [supplierLabel, supplier],
+          ['Date of Issue:', formatDate(issueDate)],
+          ['Supplier:', supplier],
           ['Project Reference:', project || ''],
           ['Delivery Address:', deliveryAddress || ''],
           ['Quote Reference:', quoteRef || ''],
-          ['Order Total (Inc VAT):', total || ''],
+          ['Order Total (Inc VAT):', total ? (total.startsWith('£') ? total : `£${total}`) : ''],
           ['Contract Person:', contractPerson || ''],
         ];
 
     rows.forEach((row, i) => {
       const y = tableTop + i * rowH;
-      // Row background
-      doc.rect(col1, y, tableWidth, rowH).fillColor(i % 2 === 0 ? '#f9f9f9' : '#ffffff').fill();
-      doc.rect(col1, y, tableWidth, rowH).strokeColor('#dddddd').lineWidth(0.5).stroke();
-      // Label
+      const val = row[1] || '\u2014';
+      const lineCount = val.split('\n').length;
+      const rH = Math.max(rowH, lineCount * 14 + 8);
+
+      doc.rect(left, y, contentW, rH).fillColor(i % 2 === 0 ? '#f7f7f7' : '#ffffff').fill();
+      doc.rect(left, y, contentW, rH).strokeColor('#dddddd').lineWidth(0.4).stroke();
       doc.fontSize(9).fillColor('#0F2D52').font('Helvetica-Bold')
-        .text(row[0], col1 + 6, y + 8, { width: 140 });
-      // Value
+        .text(row[0], left + 6, y + 7, { width: col1W - 6 });
       doc.fontSize(9).fillColor('#333').font('Helvetica')
-        .text(row[1] || '—', col2, y + 8, { width: tableWidth - 155 });
+        .text(val, left + col1W, y + 7, { width: contentW - col1W - 6 });
     });
 
-    // ── SCOPE / LINES ──
-    const afterTable = tableTop + rows.length * rowH + 16;
+    const afterTable = tableTop + rows.length * rowH + 14;
     doc.y = afterTable;
 
-    doc.fontSize(10).fillColor('#0F2D52').font('Helvetica-Bold').text('Scope of Services:', 50);
+    // ── SCOPE ──
+    doc.fontSize(9).fillColor('#0F2D52').font('Helvetica-Bold').text('Scope of Services:', left, doc.y);
     doc.moveDown(0.3);
 
     if (lines && lines.length > 0 && poType !== 'subcontractor') {
-      // Line items table
-      const lh = 20, lTop = doc.y;
-      const cols = [50, 220, 300, 355, 420, 495];
+      const lh = 18, lTop = doc.y;
+      const cols = [left, left+175, left+265, left+310, left+380, right];
       const headers = ['Description', 'Part No.', 'Qty', 'Unit Price', 'Total'];
-      // Header row
-      doc.rect(50, lTop, 495, lh).fillColor('#0F2D52').fill();
+      doc.rect(left, lTop, contentW, lh).fillColor('#0F2D52').fill();
       headers.forEach((h, i) => {
         doc.fontSize(8).fillColor('#ffffff').font('Helvetica-Bold')
-          .text(h, cols[i] + 3, lTop + 6, { width: cols[i+1] - cols[i] - 6 });
+          .text(h, cols[i] + 3, lTop + 5, { width: cols[i+1] - cols[i] - 6 });
       });
       lines.forEach((l, i) => {
         const y = lTop + lh + i * lh;
-        doc.rect(50, y, 495, lh).fillColor(i % 2 === 0 ? '#f9f9f9' : '#fff').fill();
-        doc.rect(50, y, 495, lh).strokeColor('#ddd').lineWidth(0.3).stroke();
-        const vals = [l.description, l.partNumber || '', String(l.quantity || ''), l.unitPrice ? `£${Number(l.unitPrice).toFixed(2)}` : '', l.total ? `£${Number(l.total).toFixed(2)}` : ''];
+        doc.rect(left, y, contentW, lh).fillColor(i % 2 === 0 ? '#f7f7f7' : '#fff').fill();
+        doc.rect(left, y, contentW, lh).strokeColor('#ddd').lineWidth(0.3).stroke();
+        const vals = [l.description||'', l.partNumber||'', String(l.quantity||''),
+          l.unitPrice ? `\u00a3${Number(l.unitPrice).toFixed(2)}` : '',
+          l.total ? `\u00a3${Number(l.total).toFixed(2)}` : ''];
         vals.forEach((v, j) => {
           doc.fontSize(8).fillColor('#333').font('Helvetica')
-            .text(v, cols[j] + 3, y + 6, { width: cols[j+1] - cols[j] - 6 });
+            .text(v, cols[j] + 3, y + 5, { width: cols[j+1] - cols[j] - 6 });
         });
       });
-      doc.y = lTop + lh + lines.length * lh + 10;
-      if (scope) {
-        doc.fontSize(9).fillColor('#333').font('Helvetica').text(scope, 50);
-      }
-    } else {
-      doc.fontSize(9).fillColor('#333').font('Helvetica').text(scope || `Supply as per quotation ${quoteRef}.`, 50);
+      doc.y = lTop + lh + lines.length * lh + 8;
     }
+
+    const scopeText = scope || (poType === 'subcontractor'
+      ? `Providing ${contractorName || 'contractor'} services as described above.`
+      : `Supply of Parts as per quotation ${quoteRef || ''}.`);
+    doc.fontSize(9).fillColor('#333').font('Helvetica').text(scopeText, left, doc.y, { width: contentW });
 
     // ── CONFIDENTIALITY BOX (subcontractor only) ──
     if (poType === 'subcontractor') {
       doc.moveDown(1);
-      const bY = doc.y;
-      doc.rect(50, bY, 495, 36).fillColor('#FFF4E5').fill();
-      doc.rect(50, bY, 495, 36).strokeColor('#E8622A').lineWidth(1).stroke();
-      doc.fontSize(9).fillColor('#E8622A').font('Helvetica-Bold')
-        .text('CONFIDENTIALITY REMINDER: ', 58, bY + 10, { continued: true });
+      const bY = doc.y, bH = 32;
+      doc.rect(left, bY, contentW, bH).fillColor('#FFF4E5').fill();
+      doc.rect(left, bY, contentW, bH).strokeColor('#E8622A').lineWidth(0.8).stroke();
+      doc.fontSize(8.5).fillColor('#E8622A').font('Helvetica-Bold')
+        .text('CONFIDENTIALITY REMINDER: ', left + 6, bY + 10, { continued: true });
       doc.fillColor('#333').font('Helvetica')
         .text('This purchase order is raised in accordance with dukes subcontractor Confidentiality & Customer Protection Agreement.');
     }
 
     // ── SIGNATURE BLOCK ──
-    doc.moveDown(2);
+    doc.moveDown(1.5);
     const sigY = doc.y;
     doc.fontSize(9).fillColor('#333').font('Helvetica');
-    doc.text('Signed:', 50, sigY);
-    doc.moveTo(100, sigY + 12).lineTo(280, sigY + 12).strokeColor('#333').lineWidth(0.5).stroke();
-    doc.text('Name:', 300, sigY);
-    doc.text('Stephen Pearce-Roberts', 335, sigY);
-    doc.moveTo(335, sigY + 12).lineTo(545, sigY + 12).strokeColor('#333').lineWidth(0.5).stroke();
-    doc.moveDown(1.5);
-    doc.text('Position:', 50, doc.y);
-    doc.text('Director', 100, doc.y);
-    doc.moveTo(100, doc.y + 12).lineTo(280, doc.y + 12).strokeColor('#333').lineWidth(0.5).stroke();
-    doc.text('Date:', 300, doc.y);
-    doc.text(issueDate, 335, doc.y);
-    doc.moveTo(335, doc.y + 12).lineTo(545, doc.y + 12).strokeColor('#333').lineWidth(0.5).stroke();
+
+    // Left: Signed + Position
+    doc.text('Signed:', left, sigY);
+    doc.moveTo(left + 50, sigY + 14).lineTo(left + 220, sigY + 14).strokeColor('#888').lineWidth(0.5).stroke();
+    doc.text('Position:  Director', left, sigY + 22);
+    doc.moveTo(left + 65, sigY + 36).lineTo(left + 220, sigY + 36).strokeColor('#888').lineWidth(0.5).stroke();
+
+    // Right: Name + Date
+    doc.text('Name:  Stephen Pearce-Roberts', left + 260, sigY);
+    doc.moveTo(left + 310, sigY + 14).lineTo(right, sigY + 14).strokeColor('#888').lineWidth(0.5).stroke();
+    doc.text(`Date:  ${formatDate(issueDate)}`, left + 260, sigY + 22);
+    doc.moveTo(left + 295, sigY + 36).lineTo(right, sigY + 36).strokeColor('#888').lineWidth(0.5).stroke();
 
     // ── FOOTER ──
-    doc.fontSize(8).fillColor('#888').font('Helvetica')
-      .text('www.dukecontrolsystems.com | Confidential - Property of Duke Control Systems', 50, 770, { align: 'left' })
-      .text('Content is property of Duke Control Systems. Paper copies are uncontrolled.', 50, 780, { align: 'left' });
-    doc.text('Page 1 of 1', 50, 780, { align: 'right' });
+    doc.fontSize(7.5).fillColor('#999').font('Helvetica')
+      .text('www.dukecontrolsystems.com  |  Confidential - Property of Duke Control Systems', left, 778, { width: contentW - 60, align: 'left' })
+      .text('Content is property of Duke Control Systems. Paper copies are uncontrolled.', left, 788, { width: contentW - 60, align: 'left' });
+    doc.text('Page 1 of 1', left, 783, { width: contentW, align: 'right' });
 
     doc.end();
-
     await new Promise(resolve => doc.on('end', resolve));
     const pdfBuffer = Buffer.concat(chunks);
 
@@ -631,16 +643,16 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
     db.prepare(`INSERT INTO issued_pos (id, po_number, po_type, supplier, project, quote_ref, total, delivery_address, contract_person, scope, lines, issue_date, issued_by)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(id, poNumber, poType, supplier, project || '', quoteRef || '', total || '', deliveryAddress || '', contractPerson || '', scope || '', JSON.stringify(lines || []), issueDate, req.session.user.name);
+      .run(id, poNumber, poType, supplier, project || '', quoteRef || '', total || '', deliveryAddress || '', contractPerson || contractorName || '', scope || '', JSON.stringify(lines || []), issueDate, req.session.user.name);
 
-    // Also add to goods-in purchase_orders tracking
+    // Add to goods-in purchase_orders tracking
     const poId = Date.now().toString(36) + Math.random().toString(36).slice(2) + 'g';
     const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
     db.prepare('INSERT INTO purchase_orders (id, number, supplier, project, status, created_by) VALUES (?,?,?,?,?,?)')
       .run(poId, poNumber, supplier, project || '', 'open', req.session.user.name);
     if (lines && lines.length > 0) {
       const insertLine = db.prepare('INSERT INTO po_lines (id, po_id, description, part_number, quantity, unit) VALUES (?,?,?,?,?,?)');
-      lines.forEach(l => insertLine.run(uid(), poId, l.description, l.partNumber || '', l.quantity || 1, l.unit || 'each'));
+      lines.forEach(l => insertLine.run(uid(), poId, l.description || '', l.partNumber || '', l.quantity || 1, l.unit || 'each'));
     }
 
     res.set({
