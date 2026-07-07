@@ -962,6 +962,15 @@ async function extractQuote() {
     document.getElementById('raise-scope').value = result.notes || '';
     document.getElementById('raise-issue-date').value = new Date().toISOString().slice(0,10);
 
+    // Show extracted delivery address if found
+    if (result.deliveryAddress && result.deliveryAddress.trim()) {
+      document.getElementById('raise-delivery-extracted').textContent = result.deliveryAddress.trim();
+      document.getElementById('raise-delivery-confirm').style.display = 'block';
+      document.getElementById('raise-delivery-address').value = '';
+    } else {
+      document.getElementById('raise-delivery-confirm').style.display = 'none';
+    }
+
     // Auto-generate PO number from supplier
     const supplierCode = (result.supplier || 'SUP').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0,6);
     const numRes = await api('/api/next-po-number?supplierCode=' + supplierCode);
@@ -1068,6 +1077,18 @@ async function generatePO() {
     document.getElementById('raise-step1').style.display = 'block';
     raiseLines = []; raiseSelectedFile = null;
   } catch(e) { toast('Error: ' + e.message); }
+}
+
+function confirmDeliveryAddress(checked) {
+  const extracted = document.getElementById('raise-delivery-extracted').textContent;
+  const textarea = document.getElementById('raise-delivery-address');
+  if (checked) {
+    textarea.value = extracted;
+    textarea.style.display = 'none';
+  } else {
+    textarea.value = '';
+    textarea.style.display = 'block';
+  }
 }
 
 function showRaiseProjectDropdown() {
