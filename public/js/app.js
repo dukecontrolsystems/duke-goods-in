@@ -432,6 +432,7 @@ let expandedPOs = {};
 
 async function loadOrders() {
   const el = document.getElementById('orders-list');
+  if (!el) return;
   el.innerHTML = '';
   const [pos, deliveries] = await Promise.all([api('/api/pos'), api('/api/deliveries')]);
   if (!pos.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">No purchase orders yet.<br>Add one above to get started.</div></div>'; return; }
@@ -526,11 +527,30 @@ async function loadOrders() {
 }
 
 function togglePO(id) {
+  const scrollY = window.scrollY;
   expandedPOs[id] = !expandedPOs[id];
-  loadOrders();
+  loadOrders().then(() => window.scrollTo(0, scrollY));
 }
 
 let allProjectNames = [];
+
+// Filter orders by search term
+function filterOrders(val) {
+  const q = val.toLowerCase();
+  document.querySelectorAll('#orders-list .list-card').forEach(card => {
+    const text = card.textContent.toLowerCase();
+    card.style.display = text.includes(q) ? '' : 'none';
+  });
+}
+
+// Filter projects by search term
+function filterProjects_tab(val) {
+  const q = val.toLowerCase();
+  document.querySelectorAll('#projects-list .list-card').forEach(card => {
+    const text = card.textContent.toLowerCase();
+    card.style.display = text.includes(q) ? '' : 'none';
+  });
+}
 
 async function loadProjectSuggestions() {
   try {
