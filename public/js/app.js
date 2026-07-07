@@ -883,6 +883,7 @@ function exportCSV() {
 let raisePOType = 'supplier';
 let raiseSelectedFile = null;
 let raiseLines = [];
+let raiseVatStatus = 'unknown';
 
 function selectPOType(type) {
   raisePOType = type;
@@ -962,6 +963,7 @@ async function extractQuote() {
     const vatLabel = result.vatStatus === 'inc' ? 'Order Total (Inc VAT)'
       : result.vatStatus === 'exc' ? 'Order Total (Excl VAT)'
       : 'Order Total';
+    raiseVatStatus = result.vatStatus || 'unknown';
     document.getElementById('raise-total-label').textContent = vatLabel;
     document.getElementById('raise-scope').value = result.notes || '';
     document.getElementById('raise-issue-date').value = new Date().toISOString().slice(0,10);
@@ -1050,6 +1052,7 @@ async function generatePO() {
     deliveryAddress: isSupplier ? document.getElementById('raise-delivery-address').value : '',
     quoteRef: isSupplier ? document.getElementById('raise-quote-ref').value : '',
     total: isSupplier ? document.getElementById('raise-total').value : '',
+    vatStatus: isSupplier ? raiseVatStatus : 'unknown',
     contractPerson: isSupplier ? document.getElementById('raise-contract-person').value : '',
     // Subcontractor fields
     contractorName: !isSupplier ? document.getElementById('raise-contractor-name').value : '',
@@ -1079,7 +1082,7 @@ async function generatePO() {
     // Reset form
     document.getElementById('raise-step3').style.display = 'none';
     document.getElementById('raise-step1').style.display = 'block';
-    raiseLines = []; raiseSelectedFile = null;
+    raiseLines = []; raiseSelectedFile = null; raiseVatStatus = 'unknown';
   } catch(e) { toast('Error: ' + e.message); }
 }
 
