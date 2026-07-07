@@ -67,6 +67,23 @@ db.exec(`
     note TEXT,
     is_unexpected INTEGER DEFAULT 0
   );
+
+  CREATE TABLE IF NOT EXISTS issued_pos (
+    id TEXT PRIMARY KEY,
+    po_number TEXT NOT NULL,
+    po_type TEXT NOT NULL,
+    supplier TEXT NOT NULL,
+    project TEXT,
+    quote_ref TEXT,
+    total TEXT,
+    delivery_address TEXT,
+    contract_person TEXT,
+    scope TEXT,
+    lines TEXT,
+    issue_date TEXT,
+    issued_by TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 // Migrate delivery_lines to remove foreign key if it exists
@@ -93,7 +110,7 @@ try {
   console.log('Migration skipped:', e.message);
 }
 
-// Seed default users
+// Seed default users only if none exist
 const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get();
 if (userCount.c === 0) {
   db.prepare("INSERT INTO users (name, pin, role) VALUES ('Stephen','1234','admin')").run();
