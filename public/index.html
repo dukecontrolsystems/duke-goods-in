@@ -58,9 +58,13 @@
       <span class="tab-icon">📁</span>
       <span class="tab-label">Projects</span>
     </button>
+    <button class="tab-item" onclick="goTab('raise')" id="tab-raise-btn">
+      <span class="tab-icon">✍️</span>
+      <span class="tab-label">Raise PO</span>
+    </button>
     <button class="tab-item" onclick="goTab('orders')" id="tab-orders-btn">
       <span class="tab-icon">📋</span>
-      <span class="tab-label">Orders</span>
+      <span class="tab-label">Manual Add</span>
     </button>
     <button class="tab-item" onclick="goTab('unmatched')" id="tab-unmatched-btn">
       <span class="tab-icon">⚠️</span>
@@ -86,10 +90,15 @@
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <button class="home-card" onclick="goTab('raise')">
+          <span class="home-card-icon">✍️</span>
+          <span class="home-card-title">Raise a PO</span>
+          <span class="home-card-sub">Generate a PO from a quotation</span>
+        </button>
         <button class="home-card" onclick="goTab('orders');showAddPO()">
           <span class="home-card-icon">📋</span>
-          <span class="home-card-title">Purchase Order / Order Confirmation</span>
-          <span class="home-card-sub">Upload a PO or order confirmation</span>
+          <span class="home-card-title">Manually Add PO</span>
+          <span class="home-card-sub">Add an existing PO to tracking</span>
         </button>
         <button class="home-card home-card-primary" onclick="goTab('receive')">
           <span class="home-card-icon">📦</span>
@@ -213,10 +222,133 @@
       <div id="projects-list"></div>
     </section>
 
+    <!-- ═══ RAISE PO ═══ -->
+    <section id="tab-raise" class="tab-section">
+      <div class="page-header">
+        <h2>Raise a Purchase Order</h2>
+      </div>
+
+      <!-- Step 1: Type selection -->
+      <div id="raise-step1" class="panel">
+        <div class="panel-title">Step 1 — Select PO Type</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">
+          <button class="home-card" onclick="selectPOType('supplier')" id="raise-type-supplier">
+            <span class="home-card-icon">📦</span>
+            <span class="home-card-title">Supplier PO</span>
+            <span class="home-card-sub">For materials, parts and equipment</span>
+          </button>
+          <button class="home-card" onclick="selectPOType('subcontractor')" id="raise-type-sub">
+            <span class="home-card-icon">👷</span>
+            <span class="home-card-title">Sub-Contractor PO</span>
+            <span class="home-card-sub">For contractors and engineers</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: Upload quote -->
+      <div id="raise-step2" style="display:none" class="panel">
+        <div class="panel-title">Step 2 — Upload Quotation</div>
+        <div class="upload-card compact">
+          <div class="upload-options">
+            <button class="upload-opt sm" onclick="document.getElementById('raise-camera').click()">
+              <span class="upload-opt-icon">📷</span>
+              <span class="upload-opt-label">Photo</span>
+            </button>
+            <button class="upload-opt sm" onclick="document.getElementById('raise-file').click()">
+              <span class="upload-opt-icon">📄</span>
+              <span class="upload-opt-label">File</span>
+            </button>
+          </div>
+          <input type="file" id="raise-camera" accept="image/*" capture="environment" style="display:none" onchange="raiseFileSelected(event)">
+          <input type="file" id="raise-file" accept=".pdf,.png,.jpg,.jpeg" style="display:none" onchange="raiseFileSelected(event)">
+          <div id="raise-file-preview" style="display:none" class="file-preview">
+            <span id="raise-file-name"></span>
+            <button class="btn-clear" onclick="raiseClearFile()">✕</button>
+          </div>
+        </div>
+        <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="extractQuote()">⚡ Extract from Quotation</button>
+        <button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="raiseBack()">← Back</button>
+      </div>
+
+      <!-- Step 3: Review and fill in -->
+      <div id="raise-step3" style="display:none" class="panel">
+        <div class="panel-title">Step 3 — Review & Complete</div>
+        <div id="raise-processing" style="display:none;text-align:center;padding:2rem">
+          <div style="font-size:2rem;margin-bottom:8px">⚡</div>
+          <div>Extracting quote details...</div>
+        </div>
+        <div id="raise-form">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="form-group">
+              <label>PO Number</label>
+              <input type="text" id="raise-po-number" class="input" placeholder="Auto-generated">
+            </div>
+            <div class="form-group">
+              <label>Date of Issue</label>
+              <input type="date" id="raise-issue-date" class="input">
+            </div>
+            <div class="form-group">
+              <label>Supplier / Contractor</label>
+              <input type="text" id="raise-supplier" class="input" placeholder="Company name">
+            </div>
+            <div class="form-group">
+              <label>Project Reference</label>
+              <input type="text" id="raise-project" class="input" placeholder="e.g. JLR Ship to Paint" list="raise-project-suggestions" autocomplete="off" oninput="filterProjects(this.value)" onfocus="showRaiseProjectDropdown()">
+              <div id="raise-project-dropdown" style="display:none;position:absolute;left:0;right:0;top:100%;background:#fff;border:1.5px solid #0F2D52;border-top:none;border-radius:0 0 8px 8px;z-index:50;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>
+            </div>
+          </div>
+          <div class="form-group" id="raise-supplier-address-group">
+            <label>Supplier / Contractor Address</label>
+            <textarea id="raise-supplier-address" class="textarea" rows="2" placeholder="Full address"></textarea>
+          </div>
+          <div class="form-group">
+            <label id="raise-delivery-label">Delivery Address</label>
+            <textarea id="raise-delivery-address" class="textarea" rows="3" placeholder="FAO Duke Control Systems..."></textarea>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px" id="raise-supplier-fields">
+            <div class="form-group">
+              <label>Quote Reference</label>
+              <input type="text" id="raise-quote-ref" class="input">
+            </div>
+            <div class="form-group">
+              <label>Order Total (Inc VAT)</label>
+              <input type="text" id="raise-total" class="input" placeholder="£0.00">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Contract Person</label>
+            <input type="text" id="raise-contract-person" class="input" placeholder="e.g. Nick Sweeney">
+          </div>
+          <div class="form-group">
+            <label>Scope of Services / Notes</label>
+            <textarea id="raise-scope" class="textarea" rows="3" placeholder="Supply as per quotation..."></textarea>
+          </div>
+
+          <!-- Line items (supplier only) -->
+          <div id="raise-lines-section">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#888;margin-bottom:8px">Line Items</div>
+            <div id="raise-lines-list"></div>
+            <button class="btn btn-ghost btn-sm" onclick="raiseAddLine()" style="margin-top:4px">+ Add line</button>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button class="btn btn-primary" style="flex:1" onclick="generatePO()">📄 Generate PO PDF</button>
+            <button class="btn btn-ghost btn-sm" onclick="raiseBack2()">← Back</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Issued POs list -->
+      <div style="margin-top:20px">
+        <div style="font-size:13px;font-weight:700;color:#0F2D52;margin-bottom:8px">Previously Issued POs</div>
+        <div id="issued-pos-list"><div style="color:#aaa;font-size:13px">None yet</div></div>
+      </div>
+    </section>
+
     <!-- ═══ ORDERS ═══ -->
     <section id="tab-orders" class="tab-section">
       <div class="page-header">
-        <h2>Purchase orders</h2>
+        <h2>Manually Add PO</h2>
         <button class="btn btn-primary btn-sm" onclick="showAddPO()">+ Add PO</button>
       </div>
       <input type="text" id="orders-search" class="input" placeholder="Search by supplier, PO number or project..." oninput="filterOrders(this.value)" style="margin-bottom:12px">
