@@ -1146,6 +1146,13 @@ function renderRaiseProjectDropdown(names) {
 
 let issuedPOsExpanded = false;
 
+function viewIssuedPOs() {
+  goTab('raise');
+  issuedPOsExpanded = true;
+  document.getElementById('issued-pos-list').style.display = 'block';
+  document.getElementById('issued-pos-chevron').style.transform = 'rotate(180deg)';
+}
+
 function toggleIssuedPOs() {
   issuedPOsExpanded = !issuedPOsExpanded;
   const el = document.getElementById('issued-pos-list');
@@ -1181,6 +1188,7 @@ async function loadIssuedPOs() {
           </div>
           <div style="display:flex;align-items:center;gap:8px">
             <span class="badge badge-ok" style="font-size:11px">${p.po_type === 'subcontractor' ? 'Sub-Con' : 'Supplier'}</span>
+            ${p.pdfUrl ? `<a href="${p.pdfUrl}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px" title="Download PDF">📄</a>` : ''}
             <button class="btn btn-ghost btn-sm" onclick="deleteIssuedPO('${p.id}')" style="color:#E24B4A;padding:4px 8px">🗑</button>
           </div>
         </div>
