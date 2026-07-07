@@ -115,7 +115,7 @@
           <span class="home-card-title">Unmatched <span id="home-unmatched-badge" style="display:none;background:#E24B4A;color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;margin-left:4px;vertical-align:middle"></span></span>
           <span class="home-card-sub">Deliveries needing a PO linked</span>
         </button>
-        <button class="home-card" onclick="viewIssuedPOs()">
+        <button class="home-card" onclick="goTab('raised-pos')">
           <span class="home-card-icon">🧾</span>
           <span class="home-card-title">Raised POs</span>
           <span class="home-card-sub">View and download issued PO PDFs</span>
@@ -489,6 +489,15 @@
         <button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ Export CSV</button>
       </div>
       <div id="history-list"></div>
+    </section>
+
+    <!-- ═══ RAISED POs ═══ -->
+    <section id="tab-raised-pos" class="tab-section">
+      <div class="page-header">
+        <h2>Raised purchase orders</h2>
+        <p class="page-sub">Every PO generated from this app, with a copy of the PDF</p>
+      </div>
+      <div id="raised-pos-list"></div>
     </section>
 
   </main>
