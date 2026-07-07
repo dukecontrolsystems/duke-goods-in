@@ -305,6 +305,14 @@
           <div id="raise-supplier-only-fields">
             <div class="form-group">
               <label>Delivery Address</label>
+              <div id="raise-delivery-confirm" style="display:none;background:#f0f7ea;border:1px solid #b5d9a0;border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:13px">
+                <div style="font-weight:600;color:#27500A;margin-bottom:4px">📍 Address extracted from quotation:</div>
+                <div id="raise-delivery-extracted" style="color:#333;white-space:pre-line"></div>
+                <label style="display:flex;align-items:center;gap:8px;margin-top:8px;cursor:pointer">
+                  <input type="checkbox" id="raise-delivery-ok" onchange="confirmDeliveryAddress(this.checked)"> 
+                  <span>Confirmed correct — use this address</span>
+                </label>
+              </div>
               <textarea id="raise-delivery-address" class="textarea" rows="3" placeholder="FAO Duke Control Systems..."></textarea>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
