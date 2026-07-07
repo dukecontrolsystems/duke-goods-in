@@ -414,6 +414,7 @@ app.post('/api/extract-quote', requireAuth, upload.array('file', 10), async (req
 {
   "supplier": "supplier company name",
   "supplierAddress": "full supplier address if shown",
+  "deliveryAddress": "delivery address shown on the quote if any (may say 'deliver to' or 'ship to')",
   "quoteRef": "quote or reference number",
   "date": "quote date",
   "total": "total price inc VAT if shown",
