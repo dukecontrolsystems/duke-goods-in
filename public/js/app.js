@@ -67,6 +67,7 @@ function goTab(name) {
   if (name === 'unmatched') loadUnmatched();
   if (name === 'home') loadHome();
   if (name === 'raise') { loadIssuedPOs(); loadProjectSuggestions(); }
+  if (name === 'raised-pos') loadRaisedPOs();
 }
 
 function loadHome() {
@@ -1146,16 +1147,6 @@ function renderRaiseProjectDropdown(names) {
 
 let issuedPOsExpanded = false;
 
-function viewIssuedPOs() {
-  goTab('raise');
-  issuedPOsExpanded = true;
-  document.getElementById('issued-pos-list').style.display = 'block';
-  document.getElementById('issued-pos-chevron').style.transform = 'rotate(180deg)';
-  setTimeout(() => {
-    document.getElementById('issued-pos-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, 50);
-}
-
 function toggleIssuedPOs() {
   issuedPOsExpanded = !issuedPOsExpanded;
   const el = document.getElementById('issued-pos-list');
@@ -1169,7 +1160,8 @@ async function deleteIssuedPO(id) {
   try {
     await api('/api/issued-pos/' + id, 'DELETE');
     toast('PO deleted');
-    loadIssuedPOs();
+    if (document.getElementById('issued-pos-list')) loadIssuedPOs();
+    if (document.getElementById('raised-pos-list')) loadRaisedPOs();
   } catch(e) { toast('Error: ' + e.message); }
 }
 
@@ -1199,7 +1191,71 @@ async function loadIssuedPOs() {
   } catch(e) {}
 }
 
-// ── Helpers ────────────────────────────────────────────
+// ── Raised POs (dedicated page) ─────────────────────────
+let expandedRaisedPOs = {};
+
+function toggleRaisedPO(id) {
+  const scrollY = window.scrollY;
+  expandedRaisedPOs[id] = !expandedRaisedPOs[id];
+  loadRaisedPOs().then(() => window.scrollTo(0, scrollY));
+}
+
+async function loadRaisedPOs() {
+  const el = document.getElementById('raised-pos-list');
+  if (!el) return;
+  try {
+    const pos = await api('/api/issued-pos');
+    if (!pos.length) { el.innerHTML = '<div style="color:#aaa;font-size:13px">No purchase orders raised yet</div>'; return; }
+
+    el.innerHTML = pos.map(p => {
+      const expanded = !!expandedRaisedPOs[p.id];
+      let lines = [];
+      try { lines = JSON.parse(p.lines || '[]'); } catch(e) {}
+
+      let detail = '';
+      if (expanded) {
+        if (lines.length > 0) {
+          detail = `<div style="border-top:1px solid #eee;margin-top:10px;padding-top:10px">
+            ${lines.map(l => `
+              <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:6px 4px;border-bottom:1px solid #f5f5f5;font-size:13px">
+                <div>
+                  <div style="font-weight:500">${esc(l.description || '')}</div>
+                  ${l.partNumber ? `<div style="font-size:11px;color:#888">${esc(l.partNumber)}</div>` : ''}
+                </div>
+                <div style="text-align:center;min-width:36px">${esc(String(l.quantity || ''))}</div>
+                <div style="text-align:right;min-width:60px">${l.unitPrice ? '£' + Number(l.unitPrice).toFixed(2) : ''}</div>
+                <div style="text-align:right;min-width:60px;font-weight:600">${l.total ? '£' + Number(l.total).toFixed(2) : ''}</div>
+              </div>`).join('')}
+          </div>`;
+        } else {
+          detail = `<div style="border-top:1px solid #eee;margin-top:10px;padding-top:10px;font-size:13px;color:#555">
+            ${esc(p.scope || 'No further details recorded.')}
+          </div>`;
+        }
+      }
+
+      return `<div class="list-card" style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleRaisedPO('${p.id}')">
+          <div>
+            <div style="font-weight:600;font-size:14px">${esc(p.po_number)}</div>
+            <div style="font-size:12px;color:#888;margin-top:2px">
+              ${esc(p.supplier || '')} · ${esc(p.project || '—')} · ${p.issue_date || '—'}
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px" onclick="event.stopPropagation()">
+            <span class="badge badge-ok" style="font-size:11px">${p.po_type === 'subcontractor' ? 'Sub-Con' : 'Supplier'}</span>
+            <span style="color:#aaa;font-size:18px;transition:transform .2s;display:inline-block;cursor:pointer;${expanded ? 'transform:rotate(180deg)' : ''}" onclick="toggleRaisedPO('${p.id}')">⌄</span>
+            ${p.pdfUrl ? `<a href="${p.pdfUrl}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px" title="Download PDF">📄</a>` : ''}
+            <button class="btn btn-ghost btn-sm" onclick="deleteIssuedPO('${p.id}')" style="color:#E24B4A;padding:4px 8px">🗑</button>
+          </div>
+        </div>
+        ${detail}
+      </div>`;
+    }).join('');
+  } catch(e) {}
+}
+
+
 async function api(url, method = 'GET', body) {
   const opts = { method, headers: {} };
   if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
