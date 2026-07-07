@@ -959,6 +959,10 @@ async function extractQuote() {
     document.getElementById('raise-supplier-address').value = result.supplierAddress || '';
     document.getElementById('raise-quote-ref').value = result.quoteRef || '';
     document.getElementById('raise-total').value = result.total || '';
+    const vatLabel = result.vatStatus === 'inc' ? 'Order Total (Inc VAT)'
+      : result.vatStatus === 'exc' ? 'Order Total (Excl VAT)'
+      : 'Order Total';
+    document.getElementById('raise-total-label').textContent = vatLabel;
     document.getElementById('raise-scope').value = result.notes || '';
     document.getElementById('raise-issue-date').value = new Date().toISOString().slice(0,10);
 
