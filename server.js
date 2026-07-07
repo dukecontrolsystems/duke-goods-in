@@ -497,7 +497,7 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
     // ── HEADER ──
     const logoPath = path.join(__dirname, 'public', 'logo.png');
     if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, left, 30, { width: 130 });
+      doc.image(logoPath, left, 30, { width: 110 });
     }
 
     // Top right label
@@ -621,12 +621,6 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
       doc.fillColor('#333').font('Helvetica')
         .text('This purchase order is raised in accordance with dukes subcontractor Confidentiality & Customer Protection Agreement.');
     }
-
-    // Footer on current (last) page only at fixed position
-    doc.fontSize(7.5).fillColor('#999').font('Helvetica')
-      .text('www.dukecontrolsystems.com  |  Confidential - Property of Duke Control Systems', left, 758, { width: contentW, align: 'left', lineBreak: false });
-    doc.fontSize(7.5).fillColor('#999')
-      .text('Content is property of Duke Control Systems. Paper copies are uncontrolled.', left, 768, { width: contentW, align: 'left', lineBreak: false });
 
     doc.end();
     await new Promise(resolve => doc.on('end', resolve));
