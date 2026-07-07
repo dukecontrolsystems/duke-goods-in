@@ -209,6 +209,7 @@
         <h2>Projects</h2>
         <p class="page-sub">Materials received vs outstanding per project</p>
       </div>
+      <input type="text" id="projects-search" class="input" placeholder="Search by supplier or project..." oninput="filterProjects_tab(this.value)" style="margin-bottom:12px">
       <div id="projects-list"></div>
     </section>
 
@@ -218,6 +219,7 @@
         <h2>Purchase orders</h2>
         <button class="btn btn-primary btn-sm" onclick="showAddPO()">+ Add PO</button>
       </div>
+      <input type="text" id="orders-search" class="input" placeholder="Search by supplier, PO number or project..." oninput="filterOrders(this.value)" style="margin-bottom:12px">
 
       <!-- Add PO panel -->
       <div id="add-po-panel" style="display:none" class="panel">
