@@ -951,10 +951,11 @@ async function extractQuote() {
 
     // Adjust form for type
     const isSupplier = raisePOType === 'supplier';
-    document.getElementById('raise-supplier-fields').style.display = isSupplier ? 'grid' : 'none';
+    document.getElementById('raise-supplier-only-fields').style.display = isSupplier ? 'block' : 'none';
+    document.getElementById('raise-subcon-only-fields').style.display = isSupplier ? 'none' : 'block';
     document.getElementById('raise-lines-section').style.display = isSupplier ? 'block' : 'none';
-    document.getElementById('raise-delivery-label').textContent = isSupplier ? 'Delivery Address' : 'Location';
-    document.getElementById('raise-supplier-address-group').style.display = isSupplier ? 'none' : 'block';
+    document.getElementById('raise-supplier-address-group').style.display = 'block';
+    document.getElementById('raise-address-label').textContent = isSupplier ? 'Supplier Address' : 'Company Address';
 
     // Load project suggestions
     await loadProjectSuggestions();
@@ -1000,19 +1001,28 @@ async function generatePO() {
   if (!poNumber || !supplier) { toast('PO number and supplier are required'); return; }
   if (!project) { toast('Project reference is required'); document.getElementById('raise-project').focus(); return; }
 
+  const isSupplier = raisePOType === 'supplier';
   const payload = {
     poType: raisePOType,
     poNumber,
     supplier,
     supplierAddress: document.getElementById('raise-supplier-address').value,
     project,
-    deliveryAddress: document.getElementById('raise-delivery-address').value,
-    quoteRef: document.getElementById('raise-quote-ref').value,
-    total: document.getElementById('raise-total').value,
-    contractPerson: document.getElementById('raise-contract-person').value,
+    issueDate,
     scope: document.getElementById('raise-scope').value,
-    lines: raisePOType === 'supplier' ? raiseLines : [],
-    issueDate
+    lines: isSupplier ? raiseLines : [],
+    // Supplier fields
+    deliveryAddress: isSupplier ? document.getElementById('raise-delivery-address').value : '',
+    quoteRef: isSupplier ? document.getElementById('raise-quote-ref').value : '',
+    total: isSupplier ? document.getElementById('raise-total').value : '',
+    contractPerson: isSupplier ? document.getElementById('raise-contract-person').value : '',
+    // Subcontractor fields
+    contractorName: !isSupplier ? document.getElementById('raise-contractor-name').value : '',
+    location: !isSupplier ? document.getElementById('raise-location').value : '',
+    startDate: !isSupplier ? document.getElementById('raise-start-date').value : '',
+    endDate: !isSupplier ? document.getElementById('raise-end-date').value : '',
+    hourlyRate: !isSupplier ? document.getElementById('raise-hourly-rate').value : '',
+    totalHours: !isSupplier ? document.getElementById('raise-total-hours').value : '',
   };
 
   try {
