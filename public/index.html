@@ -64,7 +64,7 @@
     </button>
     <button class="tab-item" onclick="goTab('orders')" id="tab-orders-btn">
       <span class="tab-icon">📋</span>
-      <span class="tab-label">Manual Add</span>
+      <span class="tab-label">Orders</span>
     </button>
     <button class="tab-item" onclick="goTab('unmatched')" id="tab-unmatched-btn">
       <span class="tab-icon">⚠️</span>
@@ -298,26 +298,60 @@
             </div>
           </div>
           <div class="form-group" id="raise-supplier-address-group">
-            <label>Supplier / Contractor Address</label>
+            <label id="raise-address-label">Supplier Address</label>
             <textarea id="raise-supplier-address" class="textarea" rows="2" placeholder="Full address"></textarea>
           </div>
-          <div class="form-group">
-            <label id="raise-delivery-label">Delivery Address</label>
-            <textarea id="raise-delivery-address" class="textarea" rows="3" placeholder="FAO Duke Control Systems..."></textarea>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px" id="raise-supplier-fields">
+          <!-- Supplier fields -->
+          <div id="raise-supplier-only-fields">
             <div class="form-group">
-              <label>Quote Reference</label>
-              <input type="text" id="raise-quote-ref" class="input">
+              <label>Delivery Address</label>
+              <textarea id="raise-delivery-address" class="textarea" rows="3" placeholder="FAO Duke Control Systems..."></textarea>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="form-group">
+                <label>Quote Reference</label>
+                <input type="text" id="raise-quote-ref" class="input">
+              </div>
+              <div class="form-group">
+                <label>Order Total (Inc VAT)</label>
+                <input type="text" id="raise-total" class="input" placeholder="£0.00">
+              </div>
             </div>
             <div class="form-group">
-              <label>Order Total (Inc VAT)</label>
-              <input type="text" id="raise-total" class="input" placeholder="£0.00">
+              <label>Contract Person</label>
+              <input type="text" id="raise-contract-person" class="input" placeholder="e.g. Nick Sweeney">
             </div>
           </div>
-          <div class="form-group">
-            <label>Contract Person</label>
-            <input type="text" id="raise-contract-person" class="input" placeholder="e.g. Nick Sweeney">
+          <!-- Subcontractor fields -->
+          <div id="raise-subcon-only-fields" style="display:none">
+            <div class="form-group">
+              <label>Contractor Name</label>
+              <input type="text" id="raise-contractor-name" class="input" placeholder="e.g. Rob English">
+            </div>
+            <div class="form-group">
+              <label>Location</label>
+              <input type="text" id="raise-location" class="input" placeholder="e.g. Remote + Site Visits">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="form-group">
+                <label>Start Date</label>
+                <input type="date" id="raise-start-date" class="input">
+              </div>
+              <div class="form-group">
+                <label>End Date / Duration</label>
+                <input type="text" id="raise-end-date" class="input" placeholder="e.g. Est 4 Weeks">
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="form-group">
+                <label>Hourly Rate (£/hr)</label>
+                <input type="text" id="raise-hourly-rate" class="input" placeholder="e.g. 55">
+              </div>
+              <div class="form-group">
+                <label>Total Hours (Est.)</label>
+                <input type="text" id="raise-total-hours" class="input" placeholder="e.g. 160">
+              </div>
+            </div>
           </div>
           <div class="form-group">
             <label>Scope of Services / Notes</label>
