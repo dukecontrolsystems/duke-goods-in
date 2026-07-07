@@ -622,6 +622,14 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
         .text('This purchase order is raised in accordance with dukes subcontractor Confidentiality & Customer Protection Agreement.');
     }
 
+    // Footer — save/restore prevents it joining the content flow
+    doc.save();
+    doc.fontSize(7.5).fillColor('#999').font('Helvetica')
+      .text('www.dukecontrolsystems.com  |  Confidential - Property of Duke Control Systems', left, 778, { width: contentW, lineBreak: false });
+    doc.fontSize(7.5)
+      .text('Content is property of Duke Control Systems. Paper copies are uncontrolled.', left, 788, { width: contentW, lineBreak: false });
+    doc.restore();
+
     doc.end();
     await new Promise(resolve => doc.on('end', resolve));
     const pdfBuffer = Buffer.concat(chunks);
@@ -659,6 +667,11 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
 app.get('/api/issued-pos', requireAuth, (req, res) => {
   const pos = db.prepare('SELECT * FROM issued_pos ORDER BY created_at DESC').all();
   res.json(pos);
+});
+
+app.delete('/api/issued-pos/:id', requireAuth, (req, res) => {
+  db.prepare('DELETE FROM issued_pos WHERE id=?').run(req.params.id);
+  res.json({ ok: true });
 });
 
 // ─── SERVE APP ──────────────────────────────────────────
