@@ -1102,6 +1102,15 @@ function toggleIssuedPOs() {
   chevron.style.transform = issuedPOsExpanded ? 'rotate(180deg)' : '';
 }
 
+async function deleteIssuedPO(id) {
+  if (!confirm('Delete this issued PO? This cannot be undone.')) return;
+  try {
+    await api('/api/issued-pos/' + id, 'DELETE');
+    toast('PO deleted');
+    loadIssuedPOs();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
 async function loadIssuedPOs() {
   try {
     const pos = await api('/api/issued-pos');
@@ -1118,7 +1127,10 @@ async function loadIssuedPOs() {
               ${p.supplier} · ${p.project || '—'} · ${p.issue_date || '—'}
             </div>
           </div>
-          <span class="badge badge-ok" style="font-size:11px">${p.po_type === 'subcontractor' ? 'Sub-Con' : 'Supplier'}</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="badge badge-ok" style="font-size:11px">${p.po_type === 'subcontractor' ? 'Sub-Con' : 'Supplier'}</span>
+            <button class="btn btn-ghost btn-sm" onclick="deleteIssuedPO('${p.id}')" style="color:#E24B4A;padding:4px 8px">🗑</button>
+          </div>
         </div>
       </div>`).join('');
   } catch(e) {}
