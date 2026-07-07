@@ -488,7 +488,7 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
             quoteRef, total, contractPerson, scope, lines, issueDate,
             contractorName, startDate, endDate, totalHours, hourlyRate, location } = req.body;
 
-    const doc = new PDFDocument({ size: 'A4', margins: { top: 40, bottom: 60, left: 50, right: 50 } });
+    const doc = new PDFDocument({ size: 'A4', margins: { top: 40, bottom: 40, left: 50, right: 50 }, bufferPages: true, autoFirstPage: true });
     const chunks = [];
     doc.on('data', chunk => chunks.push(chunk));
 
@@ -613,7 +613,13 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
         .text('This purchase order is raised in accordance with dukes subcontractor Confidentiality & Customer Protection Agreement.');
     }
 
-    // ── FOOTER (absolute position at bottom of page) ──
+    // ── FOOTER ── written after buffering so it always goes on page 1
+    doc.end();
+    await new Promise(resolve => doc.on('end', resolve));
+
+    // Write footer on first page only using buffered pages
+    const range = doc.bufferedPageRange();
+    doc.switchToPage(range.start);
     doc.fontSize(7.5).fillColor('#999').font('Helvetica')
       .text('www.dukecontrolsystems.com  |  Confidential - Property of Duke Control Systems', left, 778, { width: contentW - 60, align: 'left', lineBreak: false });
     doc.fontSize(7.5).fillColor('#999').font('Helvetica')
@@ -621,8 +627,7 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
     doc.fontSize(7.5).fillColor('#999').font('Helvetica')
       .text('Page 1 of 1', left, 783, { width: contentW, align: 'right', lineBreak: false });
 
-    doc.end();
-    await new Promise(resolve => doc.on('end', resolve));
+    doc.flushPages();
     const pdfBuffer = Buffer.concat(chunks);
 
     // Save to issued_pos
