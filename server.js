@@ -20,6 +20,13 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 } });
 
+// PDFs are stored under UPLOAD_DIR/pdfs (persistent Railway volume), served via /uploads
+const PDF_DIR = path.join(UPLOAD_DIR, 'pdfs');
+if (!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR, { recursive: true });
+function pdfFilenameFor(poNumber) {
+  return poNumber.replace(/[^a-zA-Z0-9-]/g, '_') + '.pdf';
+}
+
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -647,6 +654,9 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
     await new Promise(resolve => doc.on('end', resolve));
     const pdfBuffer = Buffer.concat(chunks);
 
+    // Store a copy on the persistent volume so it can be re-downloaded later
+    fs.writeFileSync(path.join(PDF_DIR, pdfFilenameFor(poNumber)), pdfBuffer);
+
     // Save to issued_pos
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
     db.prepare(`INSERT INTO issued_pos (id, po_number, po_type, supplier, project, quote_ref, total, delivery_address, contract_person, scope, lines, issue_date, issued_by)
@@ -679,6 +689,10 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
 // Get all issued POs
 app.get('/api/issued-pos', requireAuth, (req, res) => {
   const pos = db.prepare('SELECT * FROM issued_pos ORDER BY created_at DESC').all();
+  pos.forEach(p => {
+    const filename = pdfFilenameFor(p.po_number);
+    p.pdfUrl = fs.existsSync(path.join(PDF_DIR, filename)) ? `/uploads/pdfs/${filename}` : null;
+  });
   res.json(pos);
 });
 
