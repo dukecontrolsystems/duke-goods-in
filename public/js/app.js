@@ -1151,6 +1151,9 @@ function viewIssuedPOs() {
   issuedPOsExpanded = true;
   document.getElementById('issued-pos-list').style.display = 'block';
   document.getElementById('issued-pos-chevron').style.transform = 'rotate(180deg)';
+  setTimeout(() => {
+    document.getElementById('issued-pos-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 50);
 }
 
 function toggleIssuedPOs() {
