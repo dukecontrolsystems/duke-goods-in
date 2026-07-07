@@ -1246,7 +1246,12 @@ async function loadRaisedPOs() {
           <div style="display:flex;align-items:center;gap:8px" onclick="event.stopPropagation()">
             <span class="badge badge-ok" style="font-size:11px">${p.po_type === 'subcontractor' ? 'Sub-Con' : 'Supplier'}</span>
             <span style="color:#aaa;font-size:18px;transition:transform .2s;display:inline-block;cursor:pointer;${expanded ? 'transform:rotate(180deg)' : ''}" onclick="toggleRaisedPO('${p.id}')">⌄</span>
-            ${p.pdfUrl ? `<a href="${p.pdfUrl}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px" title="Download PDF">📄</a>` : ''}
+            ${p.pdfUrl
+              ? `<a href="${p.pdfUrl}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px" title="Download PDF">📄</a>`
+              : `<label class="btn btn-ghost btn-sm" style="padding:4px 8px;cursor:pointer" title="Attach a PDF for this PO">
+                   📎 Attach PDF
+                   <input type="file" accept="application/pdf" style="display:none" onchange="attachRaisedPdf('${p.id}', this)">
+                 </label>`}
             <button class="btn btn-ghost btn-sm" onclick="deleteIssuedPO('${p.id}')" style="color:#E24B4A;padding:4px 8px">🗑</button>
           </div>
         </div>
@@ -1254,6 +1259,20 @@ async function loadRaisedPOs() {
       </div>`;
     }).join('');
   } catch(e) {}
+}
+
+async function attachRaisedPdf(id, input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.type !== 'application/pdf') { toast('Please select a PDF file'); return; }
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch('/api/issued-pos/' + id + '/attach-pdf', { method: 'POST', body: fd });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || res.statusText); }
+    toast('PDF attached');
+    loadRaisedPOs();
+  } catch(e) { toast('Error: ' + e.message); }
 }
 
 
