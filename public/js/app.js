@@ -60,7 +60,8 @@ function goTab(name) {
   document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.tab-item').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
-  document.getElementById('tab-' + name + '-btn').classList.add('active');
+  const navBtn = document.getElementById('tab-' + name + '-btn');
+  if (navBtn) navBtn.classList.add('active');
   if (name === 'projects') loadProjects();
   if (name === 'orders') loadOrders();
   if (name === 'history') loadHistory();
