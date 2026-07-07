@@ -430,7 +430,7 @@ app.post('/api/extract-quote', requireAuth, upload.array('file', 10), async (req
     }
   ],
   "deliveryCharge": 0.00,
-  "notes": "any notes or terms"
+  "notes": "brief scope description only - do NOT include supplier payment terms, incoterms, VAT info or legal boilerplate"
 }` }
       ];
     } else {
@@ -595,6 +595,7 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
       doc.y = lTop + lh + lines.length * lh + 8;
     }
 
+    // Scope text — only use our own scope, not supplier terms
     const scopeText = scope || (poType === 'subcontractor'
       ? `Providing ${contractorName || 'contractor'} services as described above.`
       : `Supply of Parts as per quotation ${quoteRef || ''}.`);
@@ -612,28 +613,13 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
         .text('This purchase order is raised in accordance with dukes subcontractor Confidentiality & Customer Protection Agreement.');
     }
 
-    // ── SIGNATURE BLOCK ──
-    doc.moveDown(1.5);
-    const sigY = doc.y;
-    doc.fontSize(9).fillColor('#333').font('Helvetica');
-
-    // Left: Signed + Position
-    doc.text('Signed:', left, sigY);
-    doc.moveTo(left + 50, sigY + 14).lineTo(left + 220, sigY + 14).strokeColor('#888').lineWidth(0.5).stroke();
-    doc.text('Position:  Director', left, sigY + 22);
-    doc.moveTo(left + 65, sigY + 36).lineTo(left + 220, sigY + 36).strokeColor('#888').lineWidth(0.5).stroke();
-
-    // Right: Name + Date
-    doc.text('Name:  Stephen Pearce-Roberts', left + 260, sigY);
-    doc.moveTo(left + 310, sigY + 14).lineTo(right, sigY + 14).strokeColor('#888').lineWidth(0.5).stroke();
-    doc.text(`Date:  ${formatDate(issueDate)}`, left + 260, sigY + 22);
-    doc.moveTo(left + 295, sigY + 36).lineTo(right, sigY + 36).strokeColor('#888').lineWidth(0.5).stroke();
-
-    // ── FOOTER ──
+    // ── FOOTER (absolute position at bottom of page) ──
     doc.fontSize(7.5).fillColor('#999').font('Helvetica')
-      .text('www.dukecontrolsystems.com  |  Confidential - Property of Duke Control Systems', left, 778, { width: contentW - 60, align: 'left' })
-      .text('Content is property of Duke Control Systems. Paper copies are uncontrolled.', left, 788, { width: contentW - 60, align: 'left' });
-    doc.text('Page 1 of 1', left, 783, { width: contentW, align: 'right' });
+      .text('www.dukecontrolsystems.com  |  Confidential - Property of Duke Control Systems', left, 778, { width: contentW - 60, align: 'left', lineBreak: false });
+    doc.fontSize(7.5).fillColor('#999').font('Helvetica')
+      .text('Content is property of Duke Control Systems. Paper copies are uncontrolled.', left, 788, { width: contentW - 60, align: 'left', lineBreak: false });
+    doc.fontSize(7.5).fillColor('#999').font('Helvetica')
+      .text('Page 1 of 1', left, 783, { width: contentW, align: 'right', lineBreak: false });
 
     doc.end();
     await new Promise(resolve => doc.on('end', resolve));
