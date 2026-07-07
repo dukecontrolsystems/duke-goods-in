@@ -608,6 +608,58 @@ document.addEventListener('click', function(e) {
   }
 });
 
+// ── Raise PO project dropdown (separate mirror of the above, kept independent) ──
+function showRaiseProjectDropdown() {
+  if (!allProjectNames.length) {
+    loadProjectSuggestions().then(() => renderRaiseProjectDropdown(allProjectNames));
+    return;
+  }
+  renderRaiseProjectDropdown(allProjectNames);
+}
+
+function hideRaiseProjectDropdown() {
+  const dd = document.getElementById('raise-project-dropdown');
+  if (dd) dd.style.display = 'none';
+}
+
+function filterRaiseProjects(val) {
+  const filtered = val
+    ? allProjectNames.filter(n => n.toLowerCase().includes(val.toLowerCase()))
+    : allProjectNames;
+  renderRaiseProjectDropdown(filtered);
+}
+
+function renderRaiseProjectDropdown(names) {
+  const dd = document.getElementById('raise-project-dropdown');
+  if (!dd) return;
+  if (!names.length) { dd.style.display = 'none'; return; }
+  dd.innerHTML = names.map(n =>
+    `<div data-name="${esc(n)}"
+      style="padding:10px 14px;font-size:14px;cursor:pointer;border-bottom:0.5px solid #f0f0f0;color:#1a1a1a"
+      onmouseover="this.style.background='#EAF3DE'" onmouseout="this.style.background=''">${esc(n)}</div>`
+  ).join('');
+  dd.onclick = function(e) {
+    const item = e.target.closest('[data-name]');
+    if (item) selectRaiseProject(item.getAttribute('data-name'));
+  };
+  dd.style.display = 'block';
+}
+
+function selectRaiseProject(name) {
+  const input = document.getElementById('raise-project');
+  if (input) { input.value = name; input.focus(); }
+  hideRaiseProjectDropdown();
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+  const dd = document.getElementById('raise-project-dropdown');
+  const input = document.getElementById('raise-project');
+  if (dd && !dd.contains(e.target) && e.target !== input) {
+    dd.style.display = 'none';
+  }
+});
+
 function showAddPO() {
   document.getElementById('add-po-panel').style.display = 'block';
   document.getElementById('add-po-panel').scrollIntoView({ behavior: 'smooth' });
@@ -1122,36 +1174,6 @@ function confirmDeliveryAddress(checked) {
     textarea.value = '';
     textarea.style.display = 'block';
   }
-}
-
-function showRaiseProjectDropdown() {
-  if (!allProjectNames.length) {
-    loadProjectSuggestions().then(() => renderRaiseProjectDropdown(allProjectNames));
-    return;
-  }
-  renderRaiseProjectDropdown(allProjectNames);
-}
-
-function filterRaiseProjects(val) {
-  const filtered = val
-    ? allProjectNames.filter(n => n.toLowerCase().includes(val.toLowerCase()))
-    : allProjectNames;
-  renderRaiseProjectDropdown(filtered);
-}
-
-function renderRaiseProjectDropdown(names) {
-  const dd = document.getElementById('raise-project-dropdown');
-  if (!dd) return;
-  if (!names.length) { dd.style.display = 'none'; return; }
-  dd.innerHTML = names.map(n =>
-    `<div data-name="${esc(n)}" style="padding:10px 14px;font-size:14px;cursor:pointer;border-bottom:0.5px solid #f0f0f0;color:#1a1a1a"
-      onmouseover="this.style.background='#EAF3DE'" onmouseout="this.style.background=''">${esc(n)}</div>`
-  ).join('');
-  dd.onclick = function(e) {
-    const item = e.target.closest('[data-name]');
-    if (item) { document.getElementById('raise-project').value = item.getAttribute('data-name'); dd.style.display = 'none'; }
-  };
-  dd.style.display = 'block';
 }
 
 let issuedPOsExpanded = false;
