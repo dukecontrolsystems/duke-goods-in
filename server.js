@@ -388,6 +388,280 @@ app.delete('/api/unmatched/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ─── RAISE PO ───────────────────────────────────────────
+
+// Extract quote details using AI
+app.post('/api/extract-quote', requireAuth, upload.array('file', 10), async (req, res) => {
+  try {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const files = req.files || [];
+    let userContent;
+
+    if (files.length > 0) {
+      const fileBlocks = files.map(f => {
+        const b64 = fs.readFileSync(f.path).toString('base64');
+        const mime = f.mimetype;
+        const type = mime === 'application/pdf' ? 'document' : 'image';
+        const src = mime === 'application/pdf'
+          ? { type: 'base64', media_type: 'application/pdf', data: b64 }
+          : { type: 'base64', media_type: mime, data: b64 };
+        return { type, source: src };
+      });
+      files.forEach(f => { try { fs.unlinkSync(f.path); } catch(e) {} });
+      userContent = [
+        ...fileBlocks,
+        { type: 'text', text: `Extract all details from this quotation/quote document. Return ONLY valid JSON with these fields:
+{
+  "supplier": "supplier company name",
+  "supplierAddress": "full supplier address if shown",
+  "quoteRef": "quote or reference number",
+  "date": "quote date",
+  "total": "total price inc VAT if shown",
+  "totalExVat": "total ex VAT if shown",
+  "vatAmount": "VAT amount if shown",
+  "lines": [
+    {
+      "description": "item description",
+      "partNumber": "part/product number if shown",
+      "quantity": 1,
+      "unit": "each/pack/m etc",
+      "unitPrice": 0.00,
+      "total": 0.00
+    }
+  ],
+  "deliveryCharge": 0.00,
+  "notes": "any notes or terms"
+}` }
+      ];
+    } else {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 8000, messages: [{ role: 'user', content: userContent }] })
+    });
+    const data = await response.json();
+    const text = data.content.map(b => b.text || '').join('');
+    const start = text.indexOf('{'), end = text.lastIndexOf('}');
+    const result = JSON.parse(text.slice(start, end + 1));
+    res.json(result);
+  } catch(e) {
+    console.error('extract-quote error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get next PO number for a supplier code
+app.get('/api/next-po-number', requireAuth, (req, res) => {
+  const { supplierCode } = req.query;
+  if (!supplierCode) return res.status(400).json({ error: 'supplierCode required' });
+  const prefix = `PO-DCS-${supplierCode.toUpperCase()}-`;
+  const existing = db.prepare("SELECT po_number FROM issued_pos WHERE po_number LIKE ? ORDER BY po_number DESC").all(prefix + '%');
+  let nextNum = 1;
+  if (existing.length > 0) {
+    const last = existing[0].po_number;
+    const lastNum = parseInt(last.split('-').pop());
+    if (!isNaN(lastNum)) nextNum = lastNum + 1;
+  }
+  const number = prefix + String(nextNum).padStart(3, '0');
+  res.json({ number });
+});
+
+// Generate PO PDF and save to tracking
+app.post('/api/raise-po', requireAuth, async (req, res) => {
+  try {
+    const PDFDocument = require('pdfkit');
+    const { poType, poNumber, supplier, supplierAddress, project, deliveryAddress,
+            quoteRef, total, contractPerson, scope, lines, issueDate } = req.body;
+
+    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+    const chunks = [];
+    doc.on('data', chunk => chunks.push(chunk));
+
+    // ── HEADER ──
+    // Logo placeholder area
+    const logoPath = path.join(__dirname, 'public', 'logo.png');
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, 50, 40, { width: 160 });
+    }
+
+    // Top right type label
+    const typeLabel = poType === 'subcontractor' ? 'Sub-Contractor\nPurchase Order' : 'Supplier\nPurchase Order';
+    doc.fontSize(10).fillColor('#E8622A').font('Helvetica-Bold')
+      .text(typeLabel, 350, 45, { width: 195, align: 'right' });
+    doc.fontSize(9).fillColor('#333').font('Helvetica')
+      .text(`${poNumber} | Issue 1.0`, 350, 70, { width: 195, align: 'right' });
+
+    // Orange line under header
+    doc.moveTo(50, 90).lineTo(545, 90).strokeColor('#E8622A').lineWidth(2).stroke();
+
+    // ── TITLE ──
+    doc.moveDown(2);
+    doc.fontSize(14).fillColor('#0F2D52').font('Helvetica-Bold')
+      .text(`PURCHASE ORDER (PO) – [${poNumber}]`, 50, 110, { align: 'center' });
+
+    // Company details
+    doc.moveDown(0.5);
+    doc.fontSize(9).fillColor('#333').font('Helvetica-Oblique')
+      .text('Manageverse Consultancy Limited T/A Duke Control Systems', { align: 'center' })
+      .text('Duke Control Systems is a trading name of Manageverse Consultancy Limited registered in England &', { align: 'center' })
+      .text('Wales 14804396. Registered Office: 2 Fournier House, 8 Tenby Street, Birmingham, B1 3AJ.', { align: 'center' });
+
+    doc.moveDown(1);
+
+    // ── DETAILS TABLE ──
+    const tableTop = doc.y;
+    const col1 = 50, col2 = 200, tableWidth = 495;
+    const rowH = 28;
+    doc.font('Helvetica');
+
+    const supplierLabel = poType === 'subcontractor' ? 'Contractor:' : 'Supplier:';
+    const rows = poType === 'subcontractor'
+      ? [
+          ['Work Order Number:', poNumber],
+          ['Date of Issue:', issueDate],
+          [supplierLabel, `${supplier}\n${supplierAddress || ''}`],
+          ['Project Reference:', project || ''],
+          ['Location:', deliveryAddress || ''],
+          ['Contract Person:', contractPerson || ''],
+        ]
+      : [
+          ['Work Order Number:', poNumber],
+          ['Date of Issue:', issueDate],
+          [supplierLabel, supplier],
+          ['Project Reference:', project || ''],
+          ['Delivery Address:', deliveryAddress || ''],
+          ['Quote Reference:', quoteRef || ''],
+          ['Order Total (Inc VAT):', total || ''],
+          ['Contract Person:', contractPerson || ''],
+        ];
+
+    rows.forEach((row, i) => {
+      const y = tableTop + i * rowH;
+      // Row background
+      doc.rect(col1, y, tableWidth, rowH).fillColor(i % 2 === 0 ? '#f9f9f9' : '#ffffff').fill();
+      doc.rect(col1, y, tableWidth, rowH).strokeColor('#dddddd').lineWidth(0.5).stroke();
+      // Label
+      doc.fontSize(9).fillColor('#0F2D52').font('Helvetica-Bold')
+        .text(row[0], col1 + 6, y + 8, { width: 140 });
+      // Value
+      doc.fontSize(9).fillColor('#333').font('Helvetica')
+        .text(row[1] || '—', col2, y + 8, { width: tableWidth - 155 });
+    });
+
+    // ── SCOPE / LINES ──
+    const afterTable = tableTop + rows.length * rowH + 16;
+    doc.y = afterTable;
+
+    doc.fontSize(10).fillColor('#0F2D52').font('Helvetica-Bold').text('Scope of Services:', 50);
+    doc.moveDown(0.3);
+
+    if (lines && lines.length > 0 && poType !== 'subcontractor') {
+      // Line items table
+      const lh = 20, lTop = doc.y;
+      const cols = [50, 220, 300, 355, 420, 495];
+      const headers = ['Description', 'Part No.', 'Qty', 'Unit Price', 'Total'];
+      // Header row
+      doc.rect(50, lTop, 495, lh).fillColor('#0F2D52').fill();
+      headers.forEach((h, i) => {
+        doc.fontSize(8).fillColor('#ffffff').font('Helvetica-Bold')
+          .text(h, cols[i] + 3, lTop + 6, { width: cols[i+1] - cols[i] - 6 });
+      });
+      lines.forEach((l, i) => {
+        const y = lTop + lh + i * lh;
+        doc.rect(50, y, 495, lh).fillColor(i % 2 === 0 ? '#f9f9f9' : '#fff').fill();
+        doc.rect(50, y, 495, lh).strokeColor('#ddd').lineWidth(0.3).stroke();
+        const vals = [l.description, l.partNumber || '', String(l.quantity || ''), l.unitPrice ? `£${Number(l.unitPrice).toFixed(2)}` : '', l.total ? `£${Number(l.total).toFixed(2)}` : ''];
+        vals.forEach((v, j) => {
+          doc.fontSize(8).fillColor('#333').font('Helvetica')
+            .text(v, cols[j] + 3, y + 6, { width: cols[j+1] - cols[j] - 6 });
+        });
+      });
+      doc.y = lTop + lh + lines.length * lh + 10;
+      if (scope) {
+        doc.fontSize(9).fillColor('#333').font('Helvetica').text(scope, 50);
+      }
+    } else {
+      doc.fontSize(9).fillColor('#333').font('Helvetica').text(scope || `Supply as per quotation ${quoteRef}.`, 50);
+    }
+
+    // ── CONFIDENTIALITY BOX (subcontractor only) ──
+    if (poType === 'subcontractor') {
+      doc.moveDown(1);
+      const bY = doc.y;
+      doc.rect(50, bY, 495, 36).fillColor('#FFF4E5').fill();
+      doc.rect(50, bY, 495, 36).strokeColor('#E8622A').lineWidth(1).stroke();
+      doc.fontSize(9).fillColor('#E8622A').font('Helvetica-Bold')
+        .text('CONFIDENTIALITY REMINDER: ', 58, bY + 10, { continued: true });
+      doc.fillColor('#333').font('Helvetica')
+        .text('This purchase order is raised in accordance with dukes subcontractor Confidentiality & Customer Protection Agreement.');
+    }
+
+    // ── SIGNATURE BLOCK ──
+    doc.moveDown(2);
+    const sigY = doc.y;
+    doc.fontSize(9).fillColor('#333').font('Helvetica');
+    doc.text('Signed:', 50, sigY);
+    doc.moveTo(100, sigY + 12).lineTo(280, sigY + 12).strokeColor('#333').lineWidth(0.5).stroke();
+    doc.text('Name:', 300, sigY);
+    doc.text('Stephen Pearce-Roberts', 335, sigY);
+    doc.moveTo(335, sigY + 12).lineTo(545, sigY + 12).strokeColor('#333').lineWidth(0.5).stroke();
+    doc.moveDown(1.5);
+    doc.text('Position:', 50, doc.y);
+    doc.text('Director', 100, doc.y);
+    doc.moveTo(100, doc.y + 12).lineTo(280, doc.y + 12).strokeColor('#333').lineWidth(0.5).stroke();
+    doc.text('Date:', 300, doc.y);
+    doc.text(issueDate, 335, doc.y);
+    doc.moveTo(335, doc.y + 12).lineTo(545, doc.y + 12).strokeColor('#333').lineWidth(0.5).stroke();
+
+    // ── FOOTER ──
+    doc.fontSize(8).fillColor('#888').font('Helvetica')
+      .text('www.dukecontrolsystems.com | Confidential - Property of Duke Control Systems', 50, 770, { align: 'left' })
+      .text('Content is property of Duke Control Systems. Paper copies are uncontrolled.', 50, 780, { align: 'left' });
+    doc.text('Page 1 of 1', 50, 780, { align: 'right' });
+
+    doc.end();
+
+    await new Promise(resolve => doc.on('end', resolve));
+    const pdfBuffer = Buffer.concat(chunks);
+
+    // Save to issued_pos
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
+    db.prepare(`INSERT INTO issued_pos (id, po_number, po_type, supplier, project, quote_ref, total, delivery_address, contract_person, scope, lines, issue_date, issued_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(id, poNumber, poType, supplier, project || '', quoteRef || '', total || '', deliveryAddress || '', contractPerson || '', scope || '', JSON.stringify(lines || []), issueDate, req.session.user.name);
+
+    // Also add to goods-in purchase_orders tracking
+    const poId = Date.now().toString(36) + Math.random().toString(36).slice(2) + 'g';
+    const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
+    db.prepare('INSERT INTO purchase_orders (id, number, supplier, project, status, created_by) VALUES (?,?,?,?,?,?)')
+      .run(poId, poNumber, supplier, project || '', 'open', req.session.user.name);
+    if (lines && lines.length > 0) {
+      const insertLine = db.prepare('INSERT INTO po_lines (id, po_id, description, part_number, quantity, unit) VALUES (?,?,?,?,?,?)');
+      lines.forEach(l => insertLine.run(uid(), poId, l.description, l.partNumber || '', l.quantity || 1, l.unit || 'each'));
+    }
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${poNumber}.pdf"`,
+      'Content-Length': pdfBuffer.length
+    });
+    res.send(pdfBuffer);
+
+  } catch(e) {
+    console.error('raise-po error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get all issued POs
+app.get('/api/issued-pos', requireAuth, (req, res) => {
+  const pos = db.prepare('SELECT * FROM issued_pos ORDER BY created_at DESC').all();
+  res.json(pos);
+});
+
 // ─── SERVE APP ──────────────────────────────────────────
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
