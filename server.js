@@ -481,6 +481,17 @@ function formatDate(dateStr) {
 }
 
 // Generate PO PDF and save to tracking
+function fitText(doc, text, maxWidth, fontSize) {
+  doc.fontSize(fontSize).font('Helvetica');
+  const str = String(text || '');
+  if (doc.widthOfString(str) <= maxWidth) return str;
+  let t = str;
+  while (t.length > 0 && doc.widthOfString(t + '\u2026') > maxWidth) {
+    t = t.slice(0, -1);
+  }
+  return t + '\u2026';
+}
+
 app.post('/api/raise-po', requireAuth, async (req, res) => {
   try {
     const PDFDocument = require('pdfkit');
@@ -594,8 +605,10 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
           l.unitPrice ? `\u00a3${Number(l.unitPrice).toFixed(2)}` : '',
           l.total ? `\u00a3${Number(l.total).toFixed(2)}` : ''];
         vals.forEach((v, j) => {
+          const colWidth = cols[j+1] - cols[j] - 6;
+          const fitted = fitText(doc, v, colWidth, 8);
           doc.fontSize(8).fillColor('#333').font('Helvetica')
-            .text(v, cols[j] + 3, rowY + 5, { width: cols[j+1] - cols[j] - 6, lineBreak: false });
+            .text(fitted, cols[j] + 3, rowY + 5, { width: colWidth, lineBreak: false });
         });
         doc.y = rowY + lh;
       });
@@ -625,9 +638,9 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
     // Footer — save/restore prevents it joining the content flow
     doc.save();
     doc.fontSize(7.5).fillColor('#999').font('Helvetica')
-      .text('www.dukecontrolsystems.com  |  Confidential - Property of Duke Control Systems', left, 778, { width: contentW, lineBreak: false });
+      .text('www.dukecontrolsystems.com  |  Confidential - Property of Duke Control Systems', left, 758, { width: contentW, lineBreak: false });
     doc.fontSize(7.5)
-      .text('Content is property of Duke Control Systems. Paper copies are uncontrolled.', left, 788, { width: contentW, lineBreak: false });
+      .text('Content is property of Duke Control Systems. Paper copies are uncontrolled.', left, 768, { width: contentW, lineBreak: false });
     doc.restore();
 
     doc.end();
