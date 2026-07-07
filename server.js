@@ -492,14 +492,18 @@ app.post('/api/raise-po', requireAuth, async (req, res) => {
     const chunks = [];
     doc.on('data', chunk => chunks.push(chunk));
 
-    // Footer on every page
+    // Footer on every page — guard against re-entry
+    let addingFooter = false;
     const addFooter = () => {
+      if (addingFooter) return;
+      addingFooter = true;
       doc.save();
       doc.fontSize(7.5).fillColor('#999').font('Helvetica')
         .text('www.dukecontrolsystems.com  |  Confidential - Property of Duke Control Systems', left, 758, { width: contentW - 60, align: 'left', lineBreak: false });
       doc.fontSize(7.5).fillColor('#999')
         .text('Content is property of Duke Control Systems. Paper copies are uncontrolled.', left, 768, { width: contentW - 60, align: 'left', lineBreak: false });
       doc.restore();
+      addingFooter = false;
     };
     doc.on('pageAdded', addFooter);
 
