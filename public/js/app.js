@@ -885,7 +885,31 @@ let raiseSelectedFile = null;
 let raiseLines = [];
 let raiseVatStatus = 'unknown';
 
+function resetRaiseForm() {
+  raiseClearFile();
+  raiseLines = [];
+  raiseVatStatus = 'unknown';
+  renderRaiseLines();
+
+  ['raise-po-number','raise-supplier','raise-project','raise-supplier-address',
+   'raise-delivery-address','raise-quote-ref','raise-total','raise-contract-person',
+   'raise-contractor-name','raise-location','raise-end-date','raise-hourly-rate',
+   'raise-total-hours','raise-scope'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('raise-issue-date').value = '';
+  document.getElementById('raise-start-date').value = '';
+  document.getElementById('raise-total-label').textContent = 'Order Total';
+
+  document.getElementById('raise-delivery-confirm').style.display = 'none';
+  document.getElementById('raise-delivery-ok').checked = false;
+  document.getElementById('raise-delivery-address').style.display = 'block';
+  document.getElementById('raise-delivery-extracted').textContent = '';
+}
+
 function selectPOType(type) {
+  resetRaiseForm();
   raisePOType = type;
   document.getElementById('raise-type-supplier').style.border = type === 'supplier' ? '2px solid #0F2D52' : '';
   document.getElementById('raise-type-sub').style.border = type === 'subcontractor' ? '2px solid #0F2D52' : '';
